@@ -11,7 +11,6 @@ import (
 	"github.com/atotto/clipboard"
 	"gopkg.in/alecthomas/kingpin.v2"
 
-
 	"github.com/crholm/pl/vault"
 
 	"encoding/binary"
