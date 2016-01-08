@@ -14,9 +14,9 @@ import (
 
 	"github.com/crholm/pl/vault"
 
-//	"io"
 	"encoding/binary"
 
+	"sort"
 )
 
 
@@ -27,10 +27,11 @@ func toClipboard(password string, secondsInClipboard int ){
 
 	if(secondsInClipboard > 0){
 		time.Sleep(time.Duration(secondsInClipboard) * time.Second)
-		clipboard.WriteAll("")
+		clip, _ := clipboard.ReadAll()
+		if password == clip{
+			clipboard.WriteAll("")
+		}
 	}
-
-
 }
 
 
@@ -57,6 +58,7 @@ func createPassword(pwdLen int, noExtras bool)(string){
 
 var (
 	app      = kingpin.New("pl", "A command-line password protection application.")
+	key 	= app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
 
 	new     = app.Command("new", "Register a new password.")
 	newName = new.Arg("name", "Name of new password").Required().String()
@@ -70,42 +72,68 @@ var (
 
 	copy     = app.Command("copy", "Copy passwort to clipboard")
 	copyName = copy.Arg("name", "Name of password").Required().String()
-	copyDuration = copy.Arg("duration", "The number of scound the password remains in clipboard").Int()
+	copyDuration = copy.Arg("duration", "The number of scound the password remains in clipboard").Default("0").Int()
+
+	deleteCmd   = app.Command("delete", "Delete a password")
+	deleteName = deleteCmd.Arg("name", "Name of password").Required().String()
 )
 
 func main() {
 
-	r := bufio.NewReader(os.Stdin)
-	passBytes, _, _ := r.ReadLine()
-	vaultPassword := string(passBytes)
+	command := kingpin.MustParse(app.Parse(os.Args[1:]))
 
-	m := *vault.Load(vaultPassword)
+	var vaultPassword string
+	if *key == "" {
+		r := bufio.NewReader(os.Stdin)
+		passBytes, _, _ := r.ReadLine()
+		vaultPassword = string(passBytes)
+	}else{
+		vaultPassword = *key
+	}
 
 
-	switch kingpin.MustParse(app.Parse(os.Args[1:])) {
+	mp, err := vault.Load(vaultPassword)
+	if err != nil {
+		fmt.Println("Could not open password vault")
+		return;
+	}
+	m := *mp
+
+	switch  command {
 
 	case new.FullCommand():
 
 		m[*newName] = createPassword(*newLength, *newNoExtra)
 		vault.Save(vaultPassword, &m)
-		fmt.Println("Password for " + *newName + ": " + m[*newName])
+		fmt.Println(m[*newName])
 
+	case deleteCmd.FullCommand():
+		delete(m, string(*deleteName))
+		vault.Save(vaultPassword, &m)
 
 	case list.FullCommand():
-		fmt.Println(list.FullCommand())
+
+		l := len(m)
+		arr := make([]string, l)
+		i := 0
+		for k, _ := range m {
+			arr[i] = k
+			i++
+		}
+		sort.Strings(arr)
+		for _,v := range arr{
+			fmt.Println(v)
+		}
 
 	case show.FullCommand():
-		fmt.Println(show.FullCommand())
-		fmt.Println(*showName)
+		fmt.Println(m[*showName])
+
+	case copy.FullCommand():
+		toClipboard(m[*copyName], *copyDuration)
+
 	default:
 
 	}
 
-//
-//	toClipboard(pass, 0)
-
-
-	fmt.Println("------")
-	fmt.Println(m)
 
 }
