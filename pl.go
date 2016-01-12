@@ -60,27 +60,27 @@ func createPassword(pwdLen int, noExtras bool)(string){
 var (
 	app     	= kingpin.New("pl", "A command-line password protection application.").Author("Rasmus Holm")
 	key 		= app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
-	pipe		= app.Flag("stdin", "Reads key from stdin").Short('s').Bool()
+	stdin 		= app.Flag("stdin", "Reads key from stdin").Short('s').Bool()
 
-	new     	= app.Command("mk", "Makes and save a new password.")
-	newName 	= new.Arg("name", "Name of new password").Required().String()
-	newLength 	= new.Arg("length", "Length of new password").Default("14").Int()
-	newNoExtra 	= new.Flag("noextras", "Exclude specical characters from password").Short('n').Bool()
+	mk 			= app.Command("mk", "Makes and save a new password.")
+	mkName 		= mk.Arg("name", "Name of new password").Required().String()
+	mkLength 	= mk.Arg("length", "Length of new password").Default("14").Int()
+	mkNoExtra 	= mk.Flag("noextras", "Exclude specical characters from password").Short('n').Bool()
 
-	list     	= app.Command("ls", "List all password names")
+	ls 			= app.Command("ls", "List all password names")
 
-	show     	= app.Command("echo", "Echo selected password to stdout")
-	showName 	= show.Arg("name", "Name of password").Required().String()
+	echo		= app.Command("echo", "Echo selected password to stdout")
+	echoName 	= echo.Arg("name", "Name of password").Required().String()
 
-	copy     	= app.Command("cp", "Copy password to clipboard")
-	copyName 	= copy.Arg("name", "Name of password").Required().String()
-	copyDuration 	= copy.Arg("duration", "The number of scound the password remains in clipboard").Default("0").Int()
+	cp			= app.Command("cp", "Copy password to clipboard")
+	cpName 		= cp.Arg("name", "Name of password").Required().String()
+	cpDuration 	= cp.Arg("duration", "The number of scound the password remains in clipboard").Default("0").Int()
 
-	deleteCmd   	= app.Command("rm", "Removes a password")
-	deleteName 	= deleteCmd.Arg("name", "Name of password").Required().String()
+	rm 			= app.Command("rm", "Removes a password")
+	rmName 		= rm.Arg("name", "Name of password").Required().String()
 
 	git   		= app.Command("git", "Straight up git support for the password vault. git cli must be installed to be availible")
-	gitCommands 	= git.Arg("commands", "whatever it may be").Required().Strings()
+	gitCommands = git.Arg("commands", "whatever it may be").Required().Strings()
 )
 
 func main() {
@@ -93,7 +93,7 @@ func main() {
 
 	if command != git.FullCommand(){
 
-		if *pipe {  // key is being piped in
+		if *stdin {  // key is being piped in
 			r := bufio.NewReader(os.Stdin)
 			passBytes, _, _ := r.ReadLine()
 			vaultPassword = string(passBytes)
@@ -120,16 +120,16 @@ func main() {
 
 	switch  command {
 
-	case new.FullCommand():
-		m[*newName] = createPassword(*newLength, *newNoExtra)
+	case mk.FullCommand():
+		m[*mkName] = createPassword(*mkLength, *mkNoExtra)
 		vault.Save(vaultPassword, &m)
-		fmt.Println(m[*newName])
+		fmt.Println(m[*mkName])
 
-	case deleteCmd.FullCommand():
-		delete(m, string(*deleteName))
+	case rm.FullCommand():
+		delete(m, string(*rmName))
 		vault.Save(vaultPassword, &m)
 
-	case list.FullCommand():
+	case ls.FullCommand():
 		l := len(m)
 		arr := make([]string, l)
 		i := 0
@@ -142,14 +142,13 @@ func main() {
 			fmt.Println(v)
 		}
 
-	case show.FullCommand():
-		fmt.Println(m[*showName])
+	case echo.FullCommand():
+		fmt.Println(m[*echoName])
 
-	case copy.FullCommand():
-		toClipboard(m[*copyName], *copyDuration)
+	case cp.FullCommand():
+		toClipboard(m[*cpName], *cpDuration)
 
 	case git.FullCommand():
-
 
 		var cmdOut []byte
 		var err    error
@@ -177,6 +176,40 @@ func main() {
 	default:
 
 	}
+
+
+
+}
+
+
+func gitAddAllAndCommit(message string){
+
+	var err error
+
+	dir := os.Getenv("HOME") + "/.pl"
+
+	if _, err = exec.Command("git", "-C", dir, "add", "-A").Output(); err != nil {
+		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
+		os.Exit(1)
+	}
+
+	if _, err = exec.Command("git", "-C", dir, "commit", "-m", message).Output(); err != nil {
+		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
+		os.Exit(1)
+	}
+
+}
+
+func gitPush(){
+	var err error
+
+	dir := os.Getenv("HOME") + "/.pl"
+
+	if _, err = exec.Command("git", "-C", dir, "push").Output(); err != nil {
+		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
+		os.Exit(1)
+	}
+
 
 
 }
