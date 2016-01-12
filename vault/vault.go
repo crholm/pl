@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"encoding/base64"
 	"crypto/sha256"
-    "crypto/rand"
+	"crypto/rand"
 	"crypto/aes"
 	"io"
 	"crypto/cipher"
@@ -36,7 +36,8 @@ func hash(content []byte)([]byte){
 func encrypt(keyString string, buf []byte)([]byte, error){
 
 	h := hash(buf)
-	key := hash([]byte(keyString))
+
+	key := hash([]byte(keyString)) // TODO add salt (implement kdf)
 
 	block, err := aes.NewCipher(key[:aes.BlockSize])
 	if err != nil {
@@ -65,7 +66,8 @@ func encrypt(keyString string, buf []byte)([]byte, error){
 
 }
 func decrypt(keyString string, buf []byte)([]byte, error){
-	key := hash([]byte(keyString))
+
+	key := hash([]byte(keyString)) // TODO add salt (implement kdf)
 
 	block, err := aes.NewCipher(key[:aes.BlockSize])
 	if err != nil {
@@ -166,7 +168,7 @@ func Save(vaultPassword string, vault *map[string]string)(error) {
 	//Encrypt here =)
 	enc, _ := encrypt(vaultPassword, b.Bytes())
 
-//	fmt.Println("LEN " + string(len(enc)))
+	//	fmt.Println("LEN " + string(len(enc)))
 
 	//Encoding to base64
 	sEnc := base64.StdEncoding.EncodeToString(enc)

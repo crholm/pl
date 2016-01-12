@@ -59,25 +59,24 @@ func createPassword(pwdLen int, noExtras bool)(string){
 
 var (
 	app     	= kingpin.New("pl", "A command-line password protection application.").Author("Rasmus Holm")
-//	app.Author("Rasmus Holm")
 	key 		= app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
-	pipe		= app.Flag("pipe", "Pipe key into pl").Short('p').Bool()
+	pipe		= app.Flag("stdin", "Reads key from stdin").Short('s').Bool()
 
-	new     	= app.Command("new", "Register a new password.")
+	new     	= app.Command("mk", "Makes and save a new password.")
 	newName 	= new.Arg("name", "Name of new password").Required().String()
 	newLength 	= new.Arg("length", "Length of new password").Default("14").Int()
 	newNoExtra 	= new.Flag("noextras", "Exclude specical characters from password").Short('n').Bool()
 
-	list     	= app.Command("list", "List all password names")
+	list     	= app.Command("ls", "List all password names")
 
-	show     	= app.Command("show", "List all password names")
+	show     	= app.Command("echo", "Echo selected password to stdout")
 	showName 	= show.Arg("name", "Name of password").Required().String()
 
-	copy     	= app.Command("copy", "Copy password to clipboard")
+	copy     	= app.Command("cp", "Copy password to clipboard")
 	copyName 	= copy.Arg("name", "Name of password").Required().String()
 	copyDuration 	= copy.Arg("duration", "The number of scound the password remains in clipboard").Default("0").Int()
 
-	deleteCmd   	= app.Command("delete", "Delete a password")
+	deleteCmd   	= app.Command("rm", "Removes a password")
 	deleteName 	= deleteCmd.Arg("name", "Name of password").Required().String()
 
 	git   		= app.Command("git", "Straight up git support for the password vault. git cli must be installed to be availible")
@@ -151,10 +150,9 @@ func main() {
 
 	case git.FullCommand():
 
-		var (
-			cmdOut []byte
-			err    error
-		)
+
+		var cmdOut []byte
+		var err    error
 
 		dir := os.Getenv("HOME") + "/.pl"
 
