@@ -35,7 +35,7 @@ Commands:
     List all password names
 
   copy <name> [<duration>]
-    Copy passwort to clipboard
+    Copy password to clipboard
 
   delete <name>
     Delete a password

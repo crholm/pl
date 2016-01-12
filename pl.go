@@ -73,7 +73,7 @@ var (
 	show     	= app.Command("show", "List all password names")
 	showName 	= show.Arg("name", "Name of password").Required().String()
 
-	copy     	= app.Command("copy", "Copy passwort to clipboard")
+	copy     	= app.Command("copy", "Copy password to clipboard")
 	copyName 	= copy.Arg("name", "Name of password").Required().String()
 	copyDuration 	= copy.Arg("duration", "The number of scound the password remains in clipboard").Default("0").Int()
 
