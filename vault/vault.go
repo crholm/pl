@@ -100,7 +100,7 @@ func fileExists(path string) (bool, error) {
 func Load(vaultPassword string)(*map[string]string, error) {
 
 	dir := os.Getenv("HOME") + "/.pl"
-	file := dir + "/vault"
+	file := dir + "/default.vault"
 
 	var m map[string]string
 
@@ -172,7 +172,7 @@ func Save(vaultPassword string, vault *map[string]string)(error) {
 	sEnc := base64.StdEncoding.EncodeToString(enc)
 
 	dir := os.Getenv("HOME") + "/.pl"
-	file := dir + "/vault"
+	file := dir + "/default.vault"
 
 	//Writing to file
 	err1 := ioutil.WriteFile(file, []byte(sEnc), 0644)
