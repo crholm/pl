@@ -96,31 +96,14 @@ func main() {
 
 
 	if command != git.FullCommand(){
-
-		if *stdin {  // key is being piped in
-			r := bufio.NewReader(os.Stdin)
-			passBytes, _, _ := r.ReadLine()
-			vaultPassword = string(passBytes)
-
-		}else if len(*key) > 0{ // key is supplied in command line
-			vaultPassword = *key
-
-		}else { // key is prompted
-			fmt.Print("Enter vault key: ")
-			passBytes, _ := terminal.ReadPassword(0);
-			fmt.Println()
-			vaultPassword = string(passBytes)
+		mp, vp := readKeyAndLoad()
+		if mp == nil || vp == "" {
+			return
 		}
 
-		mp, err := vault.Load(vaultPassword)
-		if err != nil {
-			fmt.Println("Could not open password vault")
-			return;
-		}
+		vaultPassword = vp
 		m = *mp
 	}
-
-
 
 
 	switch  command {
@@ -194,6 +177,34 @@ func main() {
 }
 
 
+func readKeyAndLoad()(*map[string]string, string){
+
+	var vaultPassword string
+
+	if *stdin {  // key is being piped in
+		r := bufio.NewReader(os.Stdin)
+		passBytes, _, _ := r.ReadLine()
+		vaultPassword = string(passBytes)
+
+	}else if len(*key) > 0{ // key is supplied in command line
+		vaultPassword = *key
+
+	}else { // key is prompted
+		fmt.Print("Enter vault key: ")
+		passBytes, _ := terminal.ReadPassword(0);
+		fmt.Println()
+		vaultPassword = string(passBytes)
+	}
+
+	mp, err := vault.Load(vaultPassword)
+	if err != nil {
+		fmt.Println("Could not open password vault")
+		return nil, "";
+	}
+
+	return mp, vaultPassword
+}
+
 func hasGit()(bool){
 	dir := os.Getenv("HOME") + "/.pl"
 
@@ -230,6 +241,7 @@ func gitAddAllAndCommit(message string){
 }
 
 func gitPush(){
+	var cmdOut []byte
 	var err error
 
 	dir := os.Getenv("HOME") + "/.pl"
@@ -239,8 +251,9 @@ func gitPush(){
 		return
 	}
 
-	if _, err = exec.Command("git", "-C", dir, "push").Output(); err != nil {
+	if cmdOut, err = exec.Command("git", "-C", dir, "push").Output(); err != nil {
 		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
 		os.Exit(1)
 	}
+	fmt.Println(string(cmdOut))
 }
