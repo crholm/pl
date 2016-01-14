@@ -67,6 +67,10 @@ var (
 	mkLength 	= mk.Arg("length", "Length of new password").Default("14").Int()
 	mkNoExtra 	= mk.Flag("noextras", "Exclude specical characters from password").Short('n').Bool()
 
+	mv 			= app.Command("mv", "Rename password")
+	mvFrom 		= mv.Arg("from", "Target password to be renamed").Required().String()
+	mvTo 		= mv.Arg("to", "New password name").Required().String()
+
 	ls 			= app.Command("ls", "List all password names")
 
 	echo		= app.Command("echo", "Echo selected password to stdout")
@@ -104,6 +108,7 @@ func main() {
 		}else { // key is prompted
 			fmt.Print("Enter vault key: ")
 			passBytes, _ := terminal.ReadPassword(0);
+			fmt.Println()
 			vaultPassword = string(passBytes)
 		}
 
@@ -124,10 +129,18 @@ func main() {
 		m[*mkName] = createPassword(*mkLength, *mkNoExtra)
 		vault.Save(vaultPassword, &m)
 		fmt.Println(m[*mkName])
+		gitAddAllAndCommit("No comment =)");
+
+	case mv.FullCommand():
+		m[*mvTo] = m[*mvFrom]
+		delete(m, string(*mvFrom))
+		vault.Save(vaultPassword, &m)
+		gitAddAllAndCommit("No comment =)");
 
 	case rm.FullCommand():
 		delete(m, string(*rmName))
 		vault.Save(vaultPassword, &m)
+		gitAddAllAndCommit("No comment =)");
 
 	case ls.FullCommand():
 		l := len(m)
@@ -165,7 +178,6 @@ func main() {
 			cmdArgs = append(cmdArgs, ".")
 		}
 
-		fmt.Println(cmdArgs)
 		if cmdOut, err = exec.Command(cmdName, cmdArgs...).Output(); err != nil {
 			fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
 			os.Exit(1)
@@ -182,11 +194,28 @@ func main() {
 }
 
 
+func hasGit()(bool){
+	dir := os.Getenv("HOME") + "/.pl"
+
+	//Check if git is instantiated
+	if _, err := os.Stat(dir+"/.git"); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true;
+}
+
 func gitAddAllAndCommit(message string){
 
 	var err error
 
 	dir := os.Getenv("HOME") + "/.pl"
+
+	//Check if git is instantiated
+	if !hasGit() {
+		return
+	}
 
 	if _, err = exec.Command("git", "-C", dir, "add", "-A").Output(); err != nil {
 		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
@@ -205,11 +234,13 @@ func gitPush(){
 
 	dir := os.Getenv("HOME") + "/.pl"
 
+	//Check if git is instantiated
+	if !hasGit() {
+		return
+	}
+
 	if _, err = exec.Command("git", "-C", dir, "push").Output(); err != nil {
 		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
 		os.Exit(1)
 	}
-
-
-
 }
