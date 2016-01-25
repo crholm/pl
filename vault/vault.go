@@ -35,9 +35,14 @@ func hash(content []byte)([]byte){
 
 func encrypt(keyString string, buf []byte)([]byte, error){
 
+	salt, err := getSalt();
+	if err != nil {
+		return nil, errors.New("Could not read Salt")
+	}
+
 	h := hash(buf)
 
-	key := hash([]byte(keyString)) // TODO add salt (implement kdf)
+	key := hash(append([]byte(keyString), salt...))
 
 	block, err := aes.NewCipher(key[:aes.BlockSize])
 	if err != nil {
@@ -67,7 +72,12 @@ func encrypt(keyString string, buf []byte)([]byte, error){
 }
 func decrypt(keyString string, buf []byte)([]byte, error){
 
-	key := hash([]byte(keyString)) // TODO add salt (implement kdf)
+	salt, err := getSalt();
+	if err != nil {
+		return nil, errors.New("Could not read Salt")
+	}
+
+	key := hash(append([]byte(keyString), salt...))
 
 	block, err := aes.NewCipher(key[:aes.BlockSize])
 	if err != nil {
@@ -109,39 +119,45 @@ func Load(vaultPassword string)(*map[string]string, error) {
 	os.MkdirAll(dir, 0777)
 
 	e, _ := fileExists(file)
-	if e {
 
-		data, err := ioutil.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
-		check(err)
-
-		//Decoding from base64
-		b, err := base64.StdEncoding.DecodeString(string(data))
-		if err != nil {
-			return nil, err
-		}
-
-		//Decrypt here =)
-		dec, err := decrypt(vaultPassword, b)
-		if err != nil {
-			return nil, err
-		}
-
-		//Deserializing map
-		r := bytes.NewReader(dec)
-		d := gob.NewDecoder(r)
-
-		err = d.Decode(&m)
-
-		if err != nil {
-			return nil, err
-		}
-
-	}else{
-		m = make(map[string]string)
+	if !e {
+		return nil, errors.New("No vault exist")
 	}
+
+
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	check(err)
+
+	//Decoding from base64
+	b, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return nil, err
+	}
+
+	//Decrypt here =)
+	dec, err := decrypt(vaultPassword, b)
+	if err != nil {
+		return nil, err
+	}
+
+	//Deserializing map
+	r := bytes.NewReader(dec)
+	d := gob.NewDecoder(r)
+
+	err = d.Decode(&m)
+
+	if err != nil {
+		return nil, err
+	}
+
+
+
+
+	//m = make(map[string]string)
+
 
 
 	return &m, nil
@@ -151,6 +167,60 @@ func check(e error) {
 	if e != nil {
 		panic(e)
 	}
+}
+
+func Init(vaultPassword string)(error){
+
+	dir := os.Getenv("HOME") + "/.pl"
+	vault := dir + "/default.vault"
+	saltFile := dir + "/vault.salt"
+	b, _:= fileExists(vault)
+	if( b ){
+		return errors.New("A vault already exist")
+	}
+	b, _ = fileExists(saltFile)
+	if( b ){
+		return errors.New("A salt already exist")
+	}
+
+	os.MkdirAll(dir, 0777)
+
+	salt := make([]byte, 32);
+	io.ReadFull(rand.Reader, salt);
+	sSalt := base64.StdEncoding.EncodeToString(salt)
+
+	err1 := ioutil.WriteFile(saltFile, []byte(sSalt), 0644)
+	check(err1)
+
+
+	var m map[string]string;
+	m = make(map[string]string)
+	Save(vaultPassword, &m);
+
+
+	return nil
+}
+
+func getSalt()([]byte, error){
+	dir := os.Getenv("HOME") + "/.pl"
+	file := dir + "/vault.salt"
+	e, _ := fileExists(file)
+
+	if !e {
+		return nil, errors.New("No vault exist")
+	}
+
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	check(err)
+
+	//Decoding from base64
+	b, err := base64.StdEncoding.DecodeString(string(data))
+
+	return b, err;
+
 }
 
 func Save(vaultPassword string, vault *map[string]string)(error) {

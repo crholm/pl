@@ -62,29 +62,31 @@ var (
 	key 		= app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
 	stdin 		= app.Flag("stdin", "Reads key from stdin").Short('s').Bool()
 
-	mk 			= app.Command("mk", "Makes and save a new password.")
+	ini		= app.Command("init", "Init your vault")
+
+	mk 		= app.Command("mk", "Makes and save a new password.")
 	mkName 		= mk.Arg("name", "Name of new password").Required().String()
 	mkLength 	= mk.Arg("length", "Length of new password").Default("14").Int()
 	mkNoExtra 	= mk.Flag("noextras", "Exclude specical characters from password").Short('n').Bool()
 
-	mv 			= app.Command("mv", "Rename password")
+	mv 		= app.Command("mv", "Rename password")
 	mvFrom 		= mv.Arg("from", "Target password to be renamed").Required().String()
 	mvTo 		= mv.Arg("to", "New password name").Required().String()
 
-	ls 			= app.Command("ls", "List all password names")
+	ls 		= app.Command("ls", "List all password names")
 
-	echo		= app.Command("echo", "Echo selected password to stdout")
-	echoName 	= echo.Arg("name", "Name of password").Required().String()
+	cat 		= app.Command("cat", "Concatinates password to std out")
+	catName 	= cat.Arg("name", "Name of password").Required().String()
 
-	cp			= app.Command("cp", "Copy password to clipboard")
+	cp		= app.Command("cp", "Copy password to clipboard")
 	cpName 		= cp.Arg("name", "Name of password").Required().String()
 	cpDuration 	= cp.Arg("duration", "The number of scound the password remains in clipboard").Default("0").Int()
 
-	rm 			= app.Command("rm", "Removes a password")
+	rm 		= app.Command("rm", "Removes a password")
 	rmName 		= rm.Arg("name", "Name of password").Required().String()
 
 	git   		= app.Command("git", "Straight up git support for the password vault. git cli must be installed to be availible")
-	gitCommands = git.Arg("commands", "whatever it may be").Required().Strings()
+	gitCommands 	= git.Arg("commands", "whatever it may be").Required().Strings()
 )
 
 func main() {
@@ -95,7 +97,7 @@ func main() {
 	var m map[string]string
 
 
-	if command != git.FullCommand(){
+	if command != git.FullCommand() && command != ini.FullCommand(){
 		mp, vp := readKeyAndLoad()
 		if mp == nil || vp == "" {
 			return
@@ -106,7 +108,17 @@ func main() {
 	}
 
 
+
 	switch  command {
+
+	case ini.FullCommand():
+		vaultPassword = readKey()
+		err := vault.Init(vaultPassword)
+		if(err != nil){
+			fmt.Println(err)
+			return
+		}
+		gitAddAllAndCommit("No comment =)");
 
 	case mk.FullCommand():
 		m[*mkName] = createPassword(*mkLength, *mkNoExtra)
@@ -138,8 +150,8 @@ func main() {
 			fmt.Println(v)
 		}
 
-	case echo.FullCommand():
-		fmt.Println(m[*echoName])
+	case cat.FullCommand():
+		fmt.Println(m[*catName])
 
 	case cp.FullCommand():
 		toClipboard(m[*cpName], *cpDuration)
@@ -176,9 +188,7 @@ func main() {
 
 }
 
-
-func readKeyAndLoad()(*map[string]string, string){
-
+func readKey()(string){
 	var vaultPassword string
 
 	if *stdin {  // key is being piped in
@@ -195,10 +205,16 @@ func readKeyAndLoad()(*map[string]string, string){
 		fmt.Println()
 		vaultPassword = string(passBytes)
 	}
+	return vaultPassword;
+}
+
+func readKeyAndLoad()(*map[string]string, string){
+
+	vaultPassword := readKey();
 
 	mp, err := vault.Load(vaultPassword)
 	if err != nil {
-		fmt.Println("Could not open password vault")
+		fmt.Println(err)
 		return nil, "";
 	}
 
