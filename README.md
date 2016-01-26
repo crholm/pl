@@ -19,27 +19,35 @@ A command-line password protection application.
 Flags:
       --help     Show context-sensitive help (also try --help-long and --help-man).
   -k, --key=KEY  The key for decrypting the password vault, if not piped into the application
-  -p, --pipe     Pipe key into pl
+  -s, --stdin    Reads key from stdin
 
 Commands:
   help [<command>...]
     Show help.
 
-  new [<flags>] <name> [<length>]
-    Register a new password.
+  init
+    Init your vault
 
-  list
+  mk [<flags>] <name> [<length>]
+    Makes and save a new password.
+
+  mv <from> <to>
+    Rename password
+
+  ls
     List all password names
 
-  show <name>
-    List all password names
+  cat <name>
+    Concatinates password to std out
 
-  copy <name> [<duration>]
+  cp <name> [<duration>]
     Copy password to clipboard
 
-  delete <name>
-    Delete a password
+  rm <name>
+    Removes a password
 
   git <commands>...
     Straight up git support for the password vault. git cli must be installed to be availible
+
+
 ```
