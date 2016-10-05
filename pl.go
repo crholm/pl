@@ -90,8 +90,8 @@ var (
 	git   		= app.Command("git", "Straight up git support for the password vault. git cli must be installed to be availible")
 	gitCommands 	= git.Arg("commands", "whatever it may be").Required().Strings()
 
-	addKey		= app.Command("add-key", "Add your key to systems keychain in order to avoid applying key each time")
-	rmKey		= app.Command("remove-key", "Remove your key to systems keychain")
+	addKey		= app.Command("add-key", "Add your vault key to systems keychain in order to avoid applying key each time")
+	rmKey		= app.Command("remove-key", "Remove your vault key to systems keychain")
 )
 
 func main() {

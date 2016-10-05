@@ -49,5 +49,10 @@ Commands:
   git <commands>...
     Straight up git support for the password vault. git cli must be installed to be availible
 
+  add-key
+    Add your vault key to systems keychain in order to avoid applying key each time
+
+  remove-key
+    Remove your vault key to systems keychain
 
 ```
