@@ -11,6 +11,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/zalando/go-keyring"
 
 	"github.com/crholm/pl/vault"
 
@@ -18,6 +19,7 @@ import (
 
 	"sort"
 	"os/exec"
+	"os/user"
 )
 
 
@@ -87,6 +89,9 @@ var (
 
 	git   		= app.Command("git", "Straight up git support for the password vault. git cli must be installed to be availible")
 	gitCommands 	= git.Arg("commands", "whatever it may be").Required().Strings()
+
+	addKey		= app.Command("add-key", "Add your key to systems keychain in order to avoid applying key each time")
+	rmKey		= app.Command("remove-key", "Remove your key to systems keychain")
 )
 
 func main() {
@@ -179,6 +184,45 @@ func main() {
 		}
 		fmt.Println(string(cmdOut))
 
+	case addKey.FullCommand():
+		usr, err := user.Current();
+		if err != nil {
+			fmt.Println( err )
+		}
+		err2 := keyring.Set("pl", usr.Name, vaultPassword)
+		if err2 != nil {
+			fmt.Println(err2)
+		}
+
+		//Touching .keychain
+		file := os.Getenv("HOME") + "/.pl/.keychain"
+		f, err3 := os.Create(file);
+		if err3 != nil {
+			fmt.Println(err3)
+		}else{
+			f.Sync();
+			f.Close();
+		}
+
+		fmt.Println("Identity added: valut key savet to key chain")
+
+	case rmKey.FullCommand():
+		usr, err := user.Current();
+		if err != nil {
+			fmt.Println( err )
+		}
+
+		err2 := keyring.Delete("pl", usr.Name)
+		if err2 != nil {
+			fmt.Println(err2)
+		}
+
+		file := os.Getenv("HOME") + "/.pl/.keychain"
+		err3 := os.Remove(file);
+		if err3 != nil {
+			fmt.Println(err3)
+		}
+		fmt.Println("Identity removed: valut key removed from key chain")
 
 	default:
 
@@ -191,15 +235,28 @@ func main() {
 func readKey()(string){
 	var vaultPassword string
 
-	if *stdin {  // key is being piped in
+	usr, err := user.Current();
+	if err != nil {
+		fmt.Println( err )
+	}
+
+	// key is being piped in
+	if *stdin {
 		r := bufio.NewReader(os.Stdin)
 		passBytes, _, _ := r.ReadLine()
 		vaultPassword = string(passBytes)
 
-	}else if len(*key) > 0{ // key is supplied in command line
+	// key is supplied in command line
+	}else if len(*key) > 0{
 		vaultPassword = *key
 
-	}else { // key is prompted
+	// key is supplied by keychain
+	}else if _, err := os.Stat(os.Getenv("HOME") + "/.pl/.keychain"); err == nil {
+		passBytes, _ := keyring.Get("pl", usr.Name)
+		vaultPassword = string(passBytes)
+
+	// key is prompted for
+	}else {
 		fmt.Print("Enter vault key: ")
 		passBytes, _ := terminal.ReadPassword(0);
 		fmt.Println()
