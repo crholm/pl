@@ -40,7 +40,9 @@ func toClipboard(password string, secondsInClipboard int ){
 
 func createPassword(pwdLen int, noExtras bool)(string){
 
-	a := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	a := "0123456789"
+	a += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	a += "abcdefghijklmnopqrstuvwxyz"
 
 	if(!noExtras){
 		a += "<>|!#%&/()=+-_.:,;'*@${[]}\\ "
@@ -70,6 +72,10 @@ var (
 	mkName 		= mk.Arg("name", "Name of new password").Required().String()
 	mkLength 	= mk.Arg("length", "Length of new password").Default("14").Int()
 	mkNoExtra 	= mk.Flag("noextras", "Exclude specical characters from password").Short('n').Bool()
+
+	set 		= app.Command("set", "Saves a new password.")
+	setName 	= set.Arg("name", "Name of new password").Required().String()
+	setPassword 	= set.Arg("password", "The passowrd itself").String()
 
 	mv 		= app.Command("mv", "Rename password")
 	mvFrom 		= mv.Arg("from", "Target password to be renamed").Required().String()
@@ -128,7 +134,20 @@ func main() {
 	case mk.FullCommand():
 		m[*mkName] = createPassword(*mkLength, *mkNoExtra)
 		vault.Save(vaultPassword, &m)
-		fmt.Println(m[*mkName])
+		fmt.Println(*mkName + ": " + m[*mkName])
+		gitAddAllAndCommit("No comment =)");
+
+	case set.FullCommand():
+		len := uint64(len(*setPassword))
+		if(len == 0){
+			fmt.Print("Enter " + *setName + " Password: ")
+			passBytes, _ := terminal.ReadPassword(0);
+			m[*setName] =  string(passBytes);
+		}else{
+			m[*setName] = *setPassword
+		}
+		vault.Save(vaultPassword, &m)
+		fmt.Println(*setName)
 		gitAddAllAndCommit("No comment =)");
 
 	case mv.FullCommand():
