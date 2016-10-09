@@ -19,7 +19,6 @@ import (
 
 	"sort"
 	"os/exec"
-	"os/user"
 )
 
 
@@ -129,13 +128,13 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		gitAddAllAndCommit("No comment =)");
+		gitAddAllAndCommit("No-comment");
 
 	case mk.FullCommand():
 		m[*mkName] = createPassword(*mkLength, *mkNoExtra)
 		vault.Save(vaultPassword, &m)
 		fmt.Println(*mkName + ": " + m[*mkName])
-		gitAddAllAndCommit("No comment =)");
+		gitAddAllAndCommit("No-comment");
 
 	case set.FullCommand():
 		len := uint64(len(*setPassword))
@@ -148,18 +147,18 @@ func main() {
 		}
 		vault.Save(vaultPassword, &m)
 		fmt.Println(*setName)
-		gitAddAllAndCommit("No comment =)");
+		gitAddAllAndCommit("No-comment");
 
 	case mv.FullCommand():
 		m[*mvTo] = m[*mvFrom]
 		delete(m, string(*mvFrom))
 		vault.Save(vaultPassword, &m)
-		gitAddAllAndCommit("No comment =)");
+		gitAddAllAndCommit("No-comment");
 
 	case rm.FullCommand():
 		delete(m, string(*rmName))
 		vault.Save(vaultPassword, &m)
-		gitAddAllAndCommit("No comment =)");
+		gitAddAllAndCommit("No-comment");
 
 	case ls.FullCommand():
 		l := len(m)
@@ -204,11 +203,9 @@ func main() {
 		fmt.Println(string(cmdOut))
 
 	case addKey.FullCommand():
-		usr, err := user.Current();
-		if err != nil {
-			fmt.Println( err )
-		}
-		err2 := keyring.Set("pl", usr.Name, vaultPassword)
+		dir  := os.Getenv("HOME");
+
+		err2 := keyring.Set("pl", dir, vaultPassword)
 		if err2 != nil {
 			fmt.Println(err2)
 		}
@@ -226,12 +223,10 @@ func main() {
 		fmt.Println("Identity added: valut key savet to key chain")
 
 	case rmKey.FullCommand():
-		usr, err := user.Current();
-		if err != nil {
-			fmt.Println( err )
-		}
+		dir := os.Getenv("HOME");
 
-		err2 := keyring.Delete("pl", usr.Name)
+
+		err2 := keyring.Delete("pl", dir)
 		if err2 != nil {
 			fmt.Println(err2)
 		}
@@ -254,11 +249,7 @@ func main() {
 func readKey()(string){
 	var vaultPassword string
 
-	usr, err := user.Current();
-	if err != nil {
-		fmt.Println( err )
-	}
-
+	dir := os.Getenv("HOME");
 	// key is being piped in
 	if *stdin {
 		r := bufio.NewReader(os.Stdin)
@@ -271,7 +262,7 @@ func readKey()(string){
 
 	// key is supplied by keychain
 	}else if _, err := os.Stat(os.Getenv("HOME") + "/.pl/.keychain"); err == nil {
-		passBytes, _ := keyring.Get("pl", usr.Name)
+		passBytes, _ := keyring.Get("pl", dir)
 		vaultPassword = string(passBytes)
 
 	// key is prompted for
@@ -320,13 +311,13 @@ func gitAddAllAndCommit(message string){
 		return
 	}
 
-	if _, err = exec.Command("git", "-C", dir, "add", "-A").Output(); err != nil {
-		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
+	if _, err = exec.Command("git", "-C", dir, "add", "default.vault", "vault.salt").Output(); err != nil {
+		fmt.Fprintln(os.Stderr, "1 There was an error running git command: ", err)
 		os.Exit(1)
 	}
 
 	if _, err = exec.Command("git", "-C", dir, "commit", "-m", message).Output(); err != nil {
-		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
+		fmt.Fprintln(os.Stderr, "2 There was an error running git command: ", err)
 		os.Exit(1)
 	}
 
