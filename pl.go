@@ -19,6 +19,7 @@ import (
 
 	"sort"
 	"os/exec"
+	"bytes"
 )
 
 
@@ -69,7 +70,7 @@ var (
 
 	mk 		= app.Command("mk", "Makes and save a new password.")
 	mkName 		= mk.Arg("name", "Name of new password").Required().String()
-	mkLength 	= mk.Arg("length", "Length of new password").Default("14").Int()
+	mkLength 	= mk.Arg("length", "Length of new password").Default("16").Int()
 	mkNoExtra 	= mk.Flag("noextras", "Exclude specical characters from password").Short('n').Bool()
 
 	set 		= app.Command("set", "Saves a new password.")
@@ -101,7 +102,13 @@ var (
 
 func main() {
 
-	command := kingpin.MustParse(app.Parse(os.Args[1:]))
+	var command string;
+	if(os.Args[1] == "git"){
+		command = "git"
+	}else{
+		command = kingpin.MustParse(app.Parse(os.Args[1:]))
+
+	}
 
 	var vaultPassword string
 	var m map[string]string
@@ -180,14 +187,14 @@ func main() {
 		toClipboard(m[*cpName], *cpDuration)
 
 	case git.FullCommand():
-
-		var cmdOut []byte
-		var err    error
+		var out bytes.Buffer
+		var stderr bytes.Buffer
 
 		dir := os.Getenv("HOME") + "/.pl"
 
 		cmdName := "git"
-		cmdArgs := *gitCommands
+		cmdArgs := os.Args[2:]
+
 		// Adding path to vault dir
 		cmdArgs = append([]string{"-C",  dir }, cmdArgs...)
 
@@ -196,11 +203,17 @@ func main() {
 			cmdArgs = append(cmdArgs, ".")
 		}
 
-		if cmdOut, err = exec.Command(cmdName, cmdArgs...).Output(); err != nil {
-			fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
+		cmd := exec.Command(cmdName, cmdArgs...)
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println(fmt.Sprint(err))
+			fmt.Println(stderr.String())
 			os.Exit(1)
 		}
-		fmt.Println(string(cmdOut))
+		fmt.Println(out.String())
 
 	case addKey.FullCommand():
 		dir  := os.Getenv("HOME");
@@ -219,7 +232,6 @@ func main() {
 			f.Sync();
 			f.Close();
 		}
-
 		fmt.Println("Identity added: valut key savet to key chain")
 
 	case rmKey.FullCommand():
@@ -241,9 +253,6 @@ func main() {
 	default:
 
 	}
-
-
-
 }
 
 func readKey()(string){
