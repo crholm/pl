@@ -133,7 +133,7 @@ func main() {
 	case mk.FullCommand():
 		m[*mkName] = createPassword(*mkLength, *mkNoExtra)
 		vault.Save(vaultPassword, &m)
-		fmt.Println(*mkName + ": " + m[*mkName])
+		fmt.Println(m[*mkName])
 		gitAddAllAndCommit("No-comment");
 
 	case set.FullCommand():
