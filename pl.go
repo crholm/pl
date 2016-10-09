@@ -103,7 +103,7 @@ var (
 func main() {
 
 	var command string;
-	if(os.Args[1] == "git"){
+	if(len(os.Args) > 1 && os.Args[1] == "git"){
 		command = "git"
 	}else{
 		command = kingpin.MustParse(app.Parse(os.Args[1:]))
