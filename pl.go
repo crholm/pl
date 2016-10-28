@@ -22,82 +22,91 @@ import (
 	"os/user"
 )
 
-
-
-
-func toClipboard(password string, secondsInClipboard int ){
+func toClipboard(password string, secondsInClipboard int) {
 	clipboard.WriteAll(password)
 
-	if(secondsInClipboard > 0){
+	if (secondsInClipboard > 0) {
 		time.Sleep(time.Duration(secondsInClipboard) * time.Second)
 		clip, _ := clipboard.ReadAll()
-		if password == clip{
+		if password == clip {
 			clipboard.WriteAll("")
 		}
 	}
 }
 
-
-func createPassword(pwdLen int, noExtras bool)(string){
+func createPassword(name string, pwdLen int, noExtras bool) (*vault.Password) {
 
 	a := "0123456789"
 	a += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	a += "abcdefghijklmnopqrstuvwxyz"
 
-	if(!noExtras){
+	if (!noExtras) {
 		a += "<>|!#%&/()=+-_.:,;'*@${[]}\\ "
 	}
 
 	aLen := uint64(len(a))
 
 	buf := ""
-	for i := 0; i < pwdLen; i++{
+	for i := 0; i < pwdLen; i++ {
 		b := make([]byte, 8)
 		rand.Read(b)
 		c := binary.BigEndian.Uint64(b)
 		buf += string(a[c % aLen])
 	}
 
-	return buf
+	pwd := vault.Password{Name: name, Password:buf};
+
+
+	return &pwd
 }
 
 var (
-	app     	= kingpin.New("pl", "A command-line password protection application.").Author("Rasmus Holm")
-	key 		= app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
-	stdin 		= app.Flag("stdin", "Reads key from stdin").Short('s').Bool()
+	app = kingpin.New("pl", "A command-line password protection application.").Author("Rasmus Holm")
+	key = app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
+	stdin = app.Flag("stdin", "Reads key from stdin").Short('s').Bool()
 
-	ini		= app.Command("init", "Init your vault")
+	ini = app.Command("init", "Init your vault")
 
-	mk 		= app.Command("mk", "Makes and save a new password.")
-	mkName 		= mk.Arg("name", "Name of new password").Required().String()
-	mkLength 	= mk.Arg("length", "Length of new password").Default("14").Int()
-	mkNoExtra 	= mk.Flag("noextras", "Exclude specical characters from password").Short('n').Bool()
+	mk = app.Command("mk", "Makes and save a new password.")
+	mkName = mk.Arg("name", "Name of new password").Required().String()
+	mkLength = mk.Arg("length", "Length of new password").Default("14").Int()
+	mkNoExtra = mk.Flag("noextras", "Exclude specical characters from password").Short('n').Bool()
 
-	set 		= app.Command("set", "Saves a new password.")
-	setName 	= set.Arg("name", "Name of new password").Required().String()
-	setPassword 	= set.Arg("password", "The passowrd itself").String()
+	set = app.Command("set", "Saves a new password.")
+	setName = set.Arg("name", "Name of new password").Required().String()
+	setPassword = set.Arg("password", "The passowrd itself").String()
 
-	mv 		= app.Command("mv", "Rename password")
-	mvFrom 		= mv.Arg("from", "Target password to be renamed").Required().String()
-	mvTo 		= mv.Arg("to", "New password name").Required().String()
+	setMetadata = app.Command("set-metadata", "Alter metadata for password")
+	setMetadataPassword = setMetadata.Arg("name", "Name of password").Required().String()
+	setMetadataKey = setMetadata.Arg("key", "metadata key").Required().String()
+	setMetadataValue = setMetadata.Arg("value", "metadata value").Required().String()
 
-	ls 		= app.Command("ls", "List all password names")
+	rmMetadata = app.Command("rm-metadata", "Remove metadata for password")
+	rmMetadataPassword = rmMetadata.Arg("name", "Name of password").Required().String()
+	rmMetadataKey = rmMetadata.Arg("key", "metadata key").Required().String()
 
-	cat 		= app.Command("cat", "Concatinates password to std out")
-	catName 	= cat.Arg("name", "Name of password").Required().String()
+	mv = app.Command("mv", "Rename password")
+	mvFrom = mv.Arg("from", "Target password to be renamed").Required().String()
+	mvTo = mv.Arg("to", "New password name").Required().String()
 
-	cp		= app.Command("cp", "Copy password to clipboard")
-	cpName 		= cp.Arg("name", "Name of password").Required().String()
-	cpDuration 	= cp.Arg("duration", "The number of scound the password remains in clipboard").Default("0").Int()
+	ls = app.Command("ls", "List all password names")
+	ll = app.Command("ll", "List all password names and metadata")
 
-	rm 		= app.Command("rm", "Removes a password")
-	rmName 		= rm.Arg("name", "Name of password").Required().String()
+	cat = app.Command("cat", "Concatinates password to std out")
+	catName = cat.Arg("name", "Name of password").Required().String()
 
-	git   		= app.Command("git", "Straight up git support for the password vault. git cli must be installed to be availible")
-	gitCommands 	= git.Arg("commands", "whatever it may be").Required().Strings()
+	cp = app.Command("cp", "Copy password to clipboard")
+	cpName = cp.Arg("name", "Name of password").Required().String()
+	cpDuration = cp.Arg("duration", "The number of scound the password remains in clipboard").Default("0").Int()
 
-	addKey		= app.Command("add-key", "Add your vault key to systems keychain in order to avoid applying key each time")
-	rmKey		= app.Command("remove-key", "Remove your vault key to systems keychain")
+	rm = app.Command("rm", "Removes a password")
+	rmName = rm.Arg("name", "Name of password").Required().String()
+
+	git = app.Command("git", "Straight up git support for the password vault. git cli must be installed to be availible")
+	gitCommands = git.Arg("commands", "whatever it may be").Required().Strings()
+
+	addKey = app.Command("add-key", "Add your vault key to systems keychain in order to avoid applying key each time")
+	rmKey = app.Command("remove-key", "Remove your vault key to systems keychain")
 )
 
 func main() {
@@ -105,10 +114,9 @@ func main() {
 	command := kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	var vaultPassword string
-	var m map[string]string
+	var m map[string]*vault.Password
 
-
-	if command != git.FullCommand() && command != ini.FullCommand(){
+	if command != git.FullCommand() && command != ini.FullCommand() {
 		mp, vp := readKeyAndLoad()
 		if mp == nil || vp == "" {
 			return
@@ -118,40 +126,46 @@ func main() {
 		m = *mp
 	}
 
-
-
 	switch  command {
 
 	case ini.FullCommand():
 		vaultPassword = readKey()
 		err := vault.Init(vaultPassword)
-		if(err != nil){
+		if (err != nil) {
 			fmt.Println(err)
 			return
 		}
 		gitAddAllAndCommit("No comment =)");
 
 	case mk.FullCommand():
-		m[*mkName] = createPassword(*mkLength, *mkNoExtra)
+		m[*mkName] = createPassword(*mkName, *mkLength, *mkNoExtra)
 		vault.Save(vaultPassword, &m)
-		fmt.Println(*mkName + ": " + m[*mkName])
+		fmt.Println(*mkName + ": " + m[*mkName].Password)
 		gitAddAllAndCommit("No comment =)");
 
 	case set.FullCommand():
 		len := uint64(len(*setPassword))
-		if(len == 0){
+		if (len == 0) {
 			fmt.Print("Enter " + *setName + " Password: ")
 			passBytes, _ := terminal.ReadPassword(0);
-			m[*setName] =  string(passBytes);
-		}else{
-			m[*setName] = *setPassword
+
+			*setPassword = string(passBytes)
 		}
+
+		_, ok := m["route"]
+		if (ok) {
+			m[*setName].Password = *setPassword
+		} else {
+			m[*setName] = &vault.Password{Name: *setName, Password: *setPassword}
+		}
+
 		vault.Save(vaultPassword, &m)
 		fmt.Println(*setName)
 		gitAddAllAndCommit("No comment =)");
 
 	case mv.FullCommand():
 		m[*mvTo] = m[*mvFrom]
+		m[*mvTo].Name = *mvTo
 		delete(m, string(*mvFrom))
 		vault.Save(vaultPassword, &m)
 		gitAddAllAndCommit("No comment =)");
@@ -170,30 +184,66 @@ func main() {
 			i++
 		}
 		sort.Strings(arr)
-		for _,v := range arr{
+		for _, v := range arr {
 			fmt.Println(v)
 		}
+	case ll.FullCommand():
+		l := len(m)
+		arr := make([]string, l)
+		i := 0
+		for k, _ := range m {
+			arr[i] = k
+			i++
+		}
+		sort.Strings(arr)
+		for _, v := range arr {
+			fmt.Println(v)
+
+			l2 := len(m[v].Metadata)
+			arr2 := make([]string, l2)
+			j := 0
+			for k2, _ := range m[v].Metadata {
+				arr2[j] = k2
+				j++
+			}
+			for _, v2 := range arr2 {
+				fmt.Println( "  " +v2 + ": " + m[v].Metadata[v2])
+			}
+		}
+
 
 	case cat.FullCommand():
-		fmt.Println(m[*catName])
+		fmt.Println(m[*catName].Password)
 
 	case cp.FullCommand():
-		toClipboard(m[*cpName], *cpDuration)
+		toClipboard(m[*cpName].Password, *cpDuration)
+
+	case setMetadata.FullCommand():
+		if(m[*setMetadataPassword].Metadata == nil){
+			m[*setMetadataPassword].Metadata = make(map[string]string)
+		}
+		m[*setMetadataPassword].Metadata[*setMetadataKey] = *setMetadataValue;
+		vault.Save(vaultPassword, &m)
+	case rmMetadata.FullCommand():
+		delete(m[*rmMetadataPassword].Metadata, string(*rmMetadataKey))
+		vault.Save(vaultPassword, &m)
+		gitAddAllAndCommit("No comment =)");
+
 
 	case git.FullCommand():
 
 		var cmdOut []byte
-		var err    error
+		var err error
 
 		dir := os.Getenv("HOME") + "/.pl"
 
 		cmdName := "git"
 		cmdArgs := *gitCommands
 		// Adding path to vault dir
-		cmdArgs = append([]string{"-C",  dir }, cmdArgs...)
+		cmdArgs = append([]string{"-C", dir }, cmdArgs...)
 
 		// Whene cloning once vault repo, making sure it ends up as the root of vault dir
-		if len(cmdArgs) > 0 && cmdArgs[0] == "clone"{
+		if len(cmdArgs) > 0 && cmdArgs[0] == "clone" {
 			cmdArgs = append(cmdArgs, ".")
 		}
 
@@ -206,7 +256,7 @@ func main() {
 	case addKey.FullCommand():
 		usr, err := user.Current();
 		if err != nil {
-			fmt.Println( err )
+			fmt.Println(err)
 		}
 		err2 := keyring.Set("pl", usr.Name, vaultPassword)
 		if err2 != nil {
@@ -218,7 +268,7 @@ func main() {
 		f, err3 := os.Create(file);
 		if err3 != nil {
 			fmt.Println(err3)
-		}else{
+		} else {
 			f.Sync();
 			f.Close();
 		}
@@ -228,7 +278,7 @@ func main() {
 	case rmKey.FullCommand():
 		usr, err := user.Current();
 		if err != nil {
-			fmt.Println( err )
+			fmt.Println(err)
 		}
 
 		err2 := keyring.Delete("pl", usr.Name)
@@ -247,16 +297,14 @@ func main() {
 
 	}
 
-
-
 }
 
-func readKey()(string){
+func readKey() (string) {
 	var vaultPassword string
 
 	usr, err := user.Current();
 	if err != nil {
-		fmt.Println( err )
+		fmt.Println(err)
 	}
 
 	// key is being piped in
@@ -265,17 +313,17 @@ func readKey()(string){
 		passBytes, _, _ := r.ReadLine()
 		vaultPassword = string(passBytes)
 
-	// key is supplied in command line
-	}else if len(*key) > 0{
+		// key is supplied in command line
+	} else if len(*key) > 0 {
 		vaultPassword = *key
 
-	// key is supplied by keychain
-	}else if _, err := os.Stat(os.Getenv("HOME") + "/.pl/.keychain"); err == nil {
+		// key is supplied by keychain
+	} else if _, err := os.Stat(os.Getenv("HOME") + "/.pl/.keychain"); err == nil {
 		passBytes, _ := keyring.Get("pl", usr.Name)
 		vaultPassword = string(passBytes)
 
-	// key is prompted for
-	}else {
+		// key is prompted for
+	} else {
 		fmt.Print("Enter vault key: ")
 		passBytes, _ := terminal.ReadPassword(0);
 		fmt.Println()
@@ -284,7 +332,7 @@ func readKey()(string){
 	return vaultPassword;
 }
 
-func readKeyAndLoad()(*map[string]string, string){
+func readKeyAndLoad() (*map[string]*vault.Password, string) {
 
 	vaultPassword := readKey();
 
@@ -297,11 +345,11 @@ func readKeyAndLoad()(*map[string]string, string){
 	return mp, vaultPassword
 }
 
-func hasGit()(bool){
+func hasGit() (bool) {
 	dir := os.Getenv("HOME") + "/.pl"
 
 	//Check if git is instantiated
-	if _, err := os.Stat(dir+"/.git"); err != nil {
+	if _, err := os.Stat(dir + "/.git"); err != nil {
 		if os.IsNotExist(err) {
 			return false
 		}
@@ -309,7 +357,7 @@ func hasGit()(bool){
 	return true;
 }
 
-func gitAddAllAndCommit(message string){
+func gitAddAllAndCommit(message string) {
 
 	var err error
 
@@ -332,7 +380,7 @@ func gitAddAllAndCommit(message string){
 
 }
 
-func gitPush(){
+func gitPush() {
 	var cmdOut []byte
 	var err error
 

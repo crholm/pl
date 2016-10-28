@@ -3,8 +3,8 @@ package vault
 import (
 
 	"os"
-	"bytes"
-	"encoding/gob"
+	//"bytes"
+	//"encoding/gob"
 	"io/ioutil"
 	"encoding/base64"
 	"crypto/sha256"
@@ -14,8 +14,15 @@ import (
 	"crypto/cipher"
 	"errors"
 	"fmt"
+	"encoding/json"
 )
 
+
+type Password struct {
+	Name string
+	Password string
+	Metadata map[string]string
+}
 
 type errorVault struct {
 	s string
@@ -109,12 +116,12 @@ func fileExists(path string) (bool, error) {
 	return true, err
 }
 
-func Load(vaultPassword string)(*map[string]string, error) {
+func Load(vaultPassword string)(*map[string]*Password, error) {
 
 	dir := os.Getenv("HOME") + "/.pl"
 	file := dir + "/default.vault"
 
-	var m map[string]string
+
 
 	os.MkdirAll(dir, 0777)
 
@@ -144,21 +151,22 @@ func Load(vaultPassword string)(*map[string]string, error) {
 	}
 
 	//Deserializing map
-	r := bytes.NewReader(dec)
-	d := gob.NewDecoder(r)
+	//r := bytes.NewReader(dec)
+	//d := gob.NewDecoder(r)
 
-	err = d.Decode(&m)
+	//err = d.Decode(&m)
 
 	if err != nil {
 		return nil, err
 	}
 
+	var m map[string]*Password
 
 
 
-	//m = make(map[string]string)
+	json.Unmarshal(dec, &m)
 
-
+	//fmt.Println("JSON " + string(dec));
 
 	return &m, nil
 }
@@ -193,10 +201,11 @@ func Init(vaultPassword string)(error){
 	check(err1)
 
 
-	var m map[string]string;
-	m = make(map[string]string)
-	Save(vaultPassword, &m);
 
+
+	m := make(map[string]*Password)
+
+	Save(vaultPassword, &m);
 
 	return nil
 }
@@ -223,20 +232,20 @@ func getSalt()([]byte, error){
 
 }
 
-func Save(vaultPassword string, vault *map[string]string)(error) {
+func Save(vaultPassword string, vault *map[string]*Password)(error) {
 
 
 	//Serializing
-	b := new(bytes.Buffer)
-	e := gob.NewEncoder(b)
+	//b := new(bytes.Buffer)
+	//e := gob.NewEncoder(b)
 
-	err := e.Encode(vault)
+	jsonVault, err := json.Marshal(vault)
 	if err != nil {
 		panic(err)
 	}
 
 	//Encrypt here =)
-	enc, _ := encrypt(vaultPassword, b.Bytes())
+	enc, _ := encrypt(vaultPassword, jsonVault)
 
 	//	fmt.Println("LEN " + string(len(enc)))
 
