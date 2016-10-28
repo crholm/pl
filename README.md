@@ -31,6 +31,9 @@ Commands:
   mk [<flags>] <name> [<length>]
     Makes and save a new password.
 
+  set <name> [<password>]
+    Saves a new password.
+
   mv <from> <to>
     Rename password
 

@@ -19,7 +19,7 @@ import (
 
 	"sort"
 	"os/exec"
-	"os/user"
+	"bytes"
 )
 
 func toClipboard(password string, secondsInClipboard int) {
@@ -111,7 +111,13 @@ var (
 
 func main() {
 
-	command := kingpin.MustParse(app.Parse(os.Args[1:]))
+	var command string;
+	if(len(os.Args) > 1 && os.Args[1] == "git"){
+		command = "git"
+	}else{
+		command = kingpin.MustParse(app.Parse(os.Args[1:]))
+
+	}
 
 	var vaultPassword string
 	var m map[string]*vault.Password
@@ -135,7 +141,7 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		gitAddAllAndCommit("No comment =)");
+		gitAddAllAndCommit("No-comment");
 
 	case mk.FullCommand():
 		m[*mkName] = createPassword(*mkName, *mkLength, *mkNoExtra)
@@ -161,19 +167,19 @@ func main() {
 
 		vault.Save(vaultPassword, &m)
 		fmt.Println(*setName)
-		gitAddAllAndCommit("No comment =)");
+		gitAddAllAndCommit("No-comment");
 
 	case mv.FullCommand():
 		m[*mvTo] = m[*mvFrom]
 		m[*mvTo].Name = *mvTo
 		delete(m, string(*mvFrom))
 		vault.Save(vaultPassword, &m)
-		gitAddAllAndCommit("No comment =)");
+		gitAddAllAndCommit("No-comment");
 
 	case rm.FullCommand():
 		delete(m, string(*rmName))
 		vault.Save(vaultPassword, &m)
-		gitAddAllAndCommit("No comment =)");
+		gitAddAllAndCommit("No-comment");
 
 	case ls.FullCommand():
 		l := len(m)
@@ -231,14 +237,14 @@ func main() {
 
 
 	case git.FullCommand():
-
-		var cmdOut []byte
-		var err error
+		var out bytes.Buffer
+		var stderr bytes.Buffer
 
 		dir := os.Getenv("HOME") + "/.pl"
 
 		cmdName := "git"
-		cmdArgs := *gitCommands
+		cmdArgs := os.Args[2:]
+
 		// Adding path to vault dir
 		cmdArgs = append([]string{"-C", dir }, cmdArgs...)
 
@@ -247,18 +253,22 @@ func main() {
 			cmdArgs = append(cmdArgs, ".")
 		}
 
-		if cmdOut, err = exec.Command(cmdName, cmdArgs...).Output(); err != nil {
-			fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
+		cmd := exec.Command(cmdName, cmdArgs...)
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println(fmt.Sprint(err))
+			fmt.Println(stderr.String())
 			os.Exit(1)
 		}
-		fmt.Println(string(cmdOut))
+		fmt.Println(out.String())
 
 	case addKey.FullCommand():
-		usr, err := user.Current();
-		if err != nil {
-			fmt.Println(err)
-		}
-		err2 := keyring.Set("pl", usr.Name, vaultPassword)
+		dir  := os.Getenv("HOME");
+
+		err2 := keyring.Set("pl", dir, vaultPassword)
 		if err2 != nil {
 			fmt.Println(err2)
 		}
@@ -272,16 +282,12 @@ func main() {
 			f.Sync();
 			f.Close();
 		}
-
 		fmt.Println("Identity added: valut key savet to key chain")
 
 	case rmKey.FullCommand():
-		usr, err := user.Current();
-		if err != nil {
-			fmt.Println(err)
-		}
+		dir := os.Getenv("HOME");
 
-		err2 := keyring.Delete("pl", usr.Name)
+		err2 := keyring.Delete("pl", dir)
 		if err2 != nil {
 			fmt.Println(err2)
 		}
@@ -296,17 +302,12 @@ func main() {
 	default:
 
 	}
-
 }
 
 func readKey() (string) {
 	var vaultPassword string
 
-	usr, err := user.Current();
-	if err != nil {
-		fmt.Println(err)
-	}
-
+	dir := os.Getenv("HOME");
 	// key is being piped in
 	if *stdin {
 		r := bufio.NewReader(os.Stdin)
@@ -317,9 +318,9 @@ func readKey() (string) {
 	} else if len(*key) > 0 {
 		vaultPassword = *key
 
-		// key is supplied by keychain
-	} else if _, err := os.Stat(os.Getenv("HOME") + "/.pl/.keychain"); err == nil {
-		passBytes, _ := keyring.Get("pl", usr.Name)
+	// key is supplied by keychain
+	}else if _, err := os.Stat(os.Getenv("HOME") + "/.pl/.keychain"); err == nil {
+		passBytes, _ := keyring.Get("pl", dir)
 		vaultPassword = string(passBytes)
 
 		// key is prompted for
@@ -368,13 +369,13 @@ func gitAddAllAndCommit(message string) {
 		return
 	}
 
-	if _, err = exec.Command("git", "-C", dir, "add", "-A").Output(); err != nil {
-		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
+	if _, err = exec.Command("git", "-C", dir, "add", "default.vault", "vault.salt").Output(); err != nil {
+		fmt.Fprintln(os.Stderr, "1 There was an error running git command: ", err)
 		os.Exit(1)
 	}
 
 	if _, err = exec.Command("git", "-C", dir, "commit", "-m", message).Output(); err != nil {
-		fmt.Fprintln(os.Stderr, "There was an error running git command: ", err)
+		fmt.Fprintln(os.Stderr, "2 There was an error running git command: ", err)
 		os.Exit(1)
 	}
 
