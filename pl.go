@@ -64,7 +64,7 @@ var (
 	dir string
 	app = kingpin.New("pl", "A command-line password protection application.").Author("Rasmus Holm")
 	key = app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
-	path = app.Flag("path", "Path to key store, if deault location is not desired ($HOME/.pl)").Short('p').String()
+	path = app.Flag("path", "Path to key vault, if deault location is not desired ($HOME/.pl)").Short('p').String()
 	stdin = app.Flag("stdin", "Reads key from stdin").Short('s').Bool()
 
 	ini = app.Command("init", "Init your vault")
@@ -270,8 +270,6 @@ func main() {
 		var out bytes.Buffer
 		var stderr bytes.Buffer
 
-		dir := os.Getenv("HOME") + "/.pl"
-
 		cmdName := "git"
 		cmdArgs := os.Args[2:]
 
@@ -296,7 +294,6 @@ func main() {
 		fmt.Println(out.String())
 
 	case addKey.FullCommand():
-		dir  := os.Getenv("HOME");
 
 		err2 := keyring.Set("pl", dir, vaultPassword)
 		if err2 != nil {
@@ -304,7 +301,7 @@ func main() {
 		}
 
 		//Touching .keychain
-		file := os.Getenv("HOME") + "/.pl/.keychain"
+		file := dir + "/.keychain"
 		f, err3 := os.Create(file);
 		if err3 != nil {
 			fmt.Println(err3)
@@ -315,14 +312,13 @@ func main() {
 		fmt.Println("Identity added: valut key savet to key chain")
 
 	case rmKey.FullCommand():
-		dir := os.Getenv("HOME");
 
 		err2 := keyring.Delete("pl", dir)
 		if err2 != nil {
 			fmt.Println(err2)
 		}
 
-		file := os.Getenv("HOME") + "/.pl/.keychain"
+		file := dir + "/.keychain"
 		err3 := os.Remove(file);
 		if err3 != nil {
 			fmt.Println(err3)
@@ -337,7 +333,6 @@ func main() {
 func readKey() (string) {
 	var vaultPassword string
 
-	dir := os.Getenv("HOME");
 	// key is being piped in
 	if *stdin {
 		r := bufio.NewReader(os.Stdin)
@@ -349,7 +344,7 @@ func readKey() (string) {
 		vaultPassword = *key
 
 	// key is supplied by keychain
-	}else if _, err := os.Stat(os.Getenv("HOME") + "/.pl/.keychain"); err == nil {
+	}else if _, err := os.Stat(dir + "/.keychain"); err == nil {
 		passBytes, _ := keyring.Get("pl", dir)
 		vaultPassword = string(passBytes)
 
@@ -377,7 +372,6 @@ func readKeyAndLoad() (*map[string]*vault.Password, string) {
 }
 
 func hasGit() (bool) {
-	dir := os.Getenv("HOME") + "/.pl"
 
 	//Check if git is instantiated
 	if _, err := os.Stat(dir + "/.git"); err != nil {
@@ -391,8 +385,6 @@ func hasGit() (bool) {
 func gitAddAllAndCommit(message string) {
 
 	var err error
-
-	dir := os.Getenv("HOME") + "/.pl"
 
 	//Check if git is instantiated
 	if !hasGit() {
@@ -414,8 +406,6 @@ func gitAddAllAndCommit(message string) {
 func gitPush() {
 	var cmdOut []byte
 	var err error
-
-	dir := os.Getenv("HOME") + "/.pl"
 
 	//Check if git is instantiated
 	if !hasGit() {
