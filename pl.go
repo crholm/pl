@@ -61,8 +61,10 @@ func createPassword(name string, pwdLen int, noExtras bool) (*vault.Password) {
 }
 
 var (
+	dir string
 	app = kingpin.New("pl", "A command-line password protection application.").Author("Rasmus Holm")
 	key = app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
+	path = app.Flag("path", "Path to key store, if deault location is not desired ($HOME/.pl)").Short('p').String()
 	stdin = app.Flag("stdin", "Reads key from stdin").Short('s').Bool()
 
 	ini = app.Command("init", "Init your vault")
@@ -118,6 +120,11 @@ func main() {
 		command = kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	}
+	if(len(*path) > 0){
+		dir = *path
+	}else{
+		dir = os.Getenv("HOME") + "/.pl"
+	}
 
 	var vaultPassword string
 	var m map[string]*vault.Password
@@ -136,7 +143,7 @@ func main() {
 
 	case ini.FullCommand():
 		vaultPassword = readKey()
-		err := vault.Init(vaultPassword)
+		err := vault.Init(vaultPassword, dir)
 		if (err != nil) {
 			fmt.Println(err)
 			return
@@ -145,7 +152,7 @@ func main() {
 
 	case mk.FullCommand():
 		m[*mkName] = createPassword(*mkName, *mkLength, *mkNoExtra)
-		vault.Save(vaultPassword, &m)
+		vault.Save(vaultPassword, &m, dir)
 		fmt.Println(*mkName + ": " + m[*mkName].Password)
 		gitAddAllAndCommit("No comment =)");
 
@@ -158,27 +165,33 @@ func main() {
 			*setPassword = string(passBytes)
 		}
 
-		_, ok := m["route"]
+		pass, ok := m["route"]
 		if (ok) {
-			m[*setName].Password = *setPassword
+			pass.Password = *setPassword
 		} else {
 			m[*setName] = &vault.Password{Name: *setName, Password: *setPassword}
 		}
 
-		vault.Save(vaultPassword, &m)
+		vault.Save(vaultPassword, &m, dir)
 		fmt.Println(*setName)
 		gitAddAllAndCommit("No-comment");
 
 	case mv.FullCommand():
-		m[*mvTo] = m[*mvFrom]
-		m[*mvTo].Name = *mvTo
-		delete(m, string(*mvFrom))
-		vault.Save(vaultPassword, &m)
-		gitAddAllAndCommit("No-comment");
+		from, ok := m[*mvFrom]
+		if(ok){
+			m[*mvTo] = from
+			m[*mvTo].Name = *mvTo
+			delete(m, string(*mvFrom))
+			vault.Save(vaultPassword, &m, dir)
+			gitAddAllAndCommit("No-comment");
+		}else{
+			fmt.Println(*mvFrom + " does not exist")
+		}
+
 
 	case rm.FullCommand():
 		delete(m, string(*rmName))
-		vault.Save(vaultPassword, &m)
+		vault.Save(vaultPassword, &m, dir)
 		gitAddAllAndCommit("No-comment");
 
 	case ls.FullCommand():
@@ -219,20 +232,37 @@ func main() {
 
 
 	case cat.FullCommand():
-		fmt.Println(m[*catName].Password)
+		data, ok := m[*catName]
+		if(ok) {
+			fmt.Println(data.Password)
+		}else {
+			fmt.Println(*catName + " does not exist")
+		}
 
 	case cp.FullCommand():
-		toClipboard(m[*cpName].Password, *cpDuration)
+		data, ok := m[*cpName]
+		if(ok) {
+			toClipboard(data.Password, *cpDuration)
+		}else {
+			fmt.Println(*cpName + " does not exist")
+		}
 
 	case setMetadata.FullCommand():
-		if(m[*setMetadataPassword].Metadata == nil){
-			m[*setMetadataPassword].Metadata = make(map[string]string)
+		metadata, ok := m[*setMetadataPassword]
+		if(ok){
+			if(metadata.Metadata == nil){
+				metadata.Metadata = make(map[string]string)
+			}
+			metadata.Metadata[*setMetadataKey] = *setMetadataValue;
+			vault.Save(vaultPassword, &m, dir)
+		}else{
+			fmt.Println(*setMetadataPassword + " does not exist")
+			return
 		}
-		m[*setMetadataPassword].Metadata[*setMetadataKey] = *setMetadataValue;
-		vault.Save(vaultPassword, &m)
+
 	case rmMetadata.FullCommand():
 		delete(m[*rmMetadataPassword].Metadata, string(*rmMetadataKey))
-		vault.Save(vaultPassword, &m)
+		vault.Save(vaultPassword, &m, dir)
 		gitAddAllAndCommit("No comment =)");
 
 
@@ -337,7 +367,7 @@ func readKeyAndLoad() (*map[string]*vault.Password, string) {
 
 	vaultPassword := readKey();
 
-	mp, err := vault.Load(vaultPassword)
+	mp, err := vault.Load(vaultPassword, dir)
 	if err != nil {
 		fmt.Println(err)
 		return nil, "";

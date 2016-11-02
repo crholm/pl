@@ -40,9 +40,9 @@ func hash(content []byte)([]byte){
 	return h.Sum(nil)
 }
 
-func encrypt(keyString string, buf []byte)([]byte, error){
+func encrypt(keyString string, buf []byte, dir string)([]byte, error){
 
-	salt, err := getSalt();
+	salt, err := getSalt(dir);
 	if err != nil {
 		return nil, errors.New("Could not read Salt")
 	}
@@ -77,9 +77,9 @@ func encrypt(keyString string, buf []byte)([]byte, error){
 	return ciphertext, nil
 
 }
-func decrypt(keyString string, buf []byte)([]byte, error){
+func decrypt(keyString string, buf []byte, dir string)([]byte, error){
 
-	salt, err := getSalt();
+	salt, err := getSalt(dir);
 	if err != nil {
 		return nil, errors.New("Could not read Salt")
 	}
@@ -116,9 +116,9 @@ func fileExists(path string) (bool, error) {
 	return true, err
 }
 
-func Load(vaultPassword string)(*map[string]*Password, error) {
+func Load(vaultPassword string, dir string)(*map[string]*Password, error) {
 
-	dir := os.Getenv("HOME") + "/.pl"
+	//dir := os.Getenv("HOME") + "/.pl"
 	file := dir + "/default.vault"
 
 
@@ -145,7 +145,7 @@ func Load(vaultPassword string)(*map[string]*Password, error) {
 	}
 
 	//Decrypt here =)
-	dec, err := decrypt(vaultPassword, b)
+	dec, err := decrypt(vaultPassword, b, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -177,9 +177,9 @@ func check(e error) {
 	}
 }
 
-func Init(vaultPassword string)(error){
+func Init(vaultPassword string, dir string)(error){
 
-	dir := os.Getenv("HOME") + "/.pl"
+	//dir := os.Getenv("HOME") + "/.pl"
 	vault := dir + "/default.vault"
 	saltFile := dir + "/vault.salt"
 	b, _:= fileExists(vault)
@@ -205,13 +205,13 @@ func Init(vaultPassword string)(error){
 
 	m := make(map[string]*Password)
 
-	Save(vaultPassword, &m);
+	Save(vaultPassword, &m, dir);
 
 	return nil
 }
 
-func getSalt()([]byte, error){
-	dir := os.Getenv("HOME") + "/.pl"
+func getSalt(dir string)([]byte, error){
+	//dir := os.Getenv("HOME") + "/.pl"
 	file := dir + "/vault.salt"
 	e, _ := fileExists(file)
 
@@ -232,7 +232,7 @@ func getSalt()([]byte, error){
 
 }
 
-func Save(vaultPassword string, vault *map[string]*Password)(error) {
+func Save(vaultPassword string, vault *map[string]*Password, dir string)(error) {
 
 
 	//Serializing
@@ -245,14 +245,14 @@ func Save(vaultPassword string, vault *map[string]*Password)(error) {
 	}
 
 	//Encrypt here =)
-	enc, _ := encrypt(vaultPassword, jsonVault)
+	enc, _ := encrypt(vaultPassword, jsonVault, dir)
 
 	//	fmt.Println("LEN " + string(len(enc)))
 
 	//Encoding to base64
 	sEnc := base64.StdEncoding.EncodeToString(enc)
 
-	dir := os.Getenv("HOME") + "/.pl"
+	//dir := os.Getenv("HOME") + "/.pl"
 	file := dir + "/default.vault"
 
 	//Writing to file
