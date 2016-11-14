@@ -1,10 +1,7 @@
 package vault
 
 import (
-
 	"os"
-	//"bytes"
-	//"encoding/gob"
 	"io/ioutil"
 	"encoding/base64"
 	"crypto/sha256"
@@ -15,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"encoding/json"
+	"golang.org/x/crypto/scrypt"
 )
 
 
@@ -22,6 +20,11 @@ type Password struct {
 	Name string
 	Password string
 	Metadata map[string]string
+}
+type scryptSettings struct {
+	N int //CPU
+	R int //RAM
+	P int //Parallelism
 }
 
 type errorVault struct {
@@ -40,6 +43,42 @@ func hash(content []byte)([]byte){
 	return h.Sum(nil)
 }
 
+func SetScryptSettings(N int, r int, p int, dir string){
+	scryptFile := dir + "/scrypt.conf"
+
+	scryptData := scryptSettings{N: N, R: r, P: p}
+	jsonScryptData, err := json.Marshal(scryptData)
+	if err != nil {
+		panic(err)
+	}
+	err2 := ioutil.WriteFile(scryptFile, []byte(jsonScryptData), 0644)
+	check(err2)
+}
+
+func keyStretch(key string, salt []byte, dir string)([]byte){
+	//The recommended parameters for interactive logins as of 2009 are N=16384, r=8, p=1
+
+	file := dir + "/scrypt.conf"
+	err1, _ := fileExists(file)
+	if !err1 {
+		panic(errors.New("No scrypt config exist"))
+	}
+
+	data, err2 := ioutil.ReadFile(file)
+	if err2 != nil {
+		panic(err2)
+	}
+	check(err2)
+
+	var settings scryptSettings
+	json.Unmarshal(data, &settings)
+
+
+	dk, _ := scrypt.Key([]byte(key), salt, settings.N, settings.R, settings.P, 32)
+
+	return dk;
+}
+
 func encrypt(keyString string, buf []byte, dir string)([]byte, error){
 
 	salt, err := getSalt(dir);
@@ -49,7 +88,7 @@ func encrypt(keyString string, buf []byte, dir string)([]byte, error){
 
 	h := hash(buf)
 
-	key := hash(append([]byte(keyString), salt...))
+	key := keyStretch(keyString, salt, dir);
 
 	block, err := aes.NewCipher(key[:aes.BlockSize])
 	if err != nil {
@@ -84,7 +123,7 @@ func decrypt(keyString string, buf []byte, dir string)([]byte, error){
 		return nil, errors.New("Could not read Salt")
 	}
 
-	key := hash(append([]byte(keyString), salt...))
+	key := keyStretch(keyString, salt, dir);
 
 	block, err := aes.NewCipher(key[:aes.BlockSize])
 	if err != nil {
@@ -118,7 +157,6 @@ func fileExists(path string) (bool, error) {
 
 func Load(vaultPassword string, dir string)(*map[string]*Password, error) {
 
-	//dir := os.Getenv("HOME") + "/.pl"
 	file := dir + "/default.vault"
 
 
@@ -150,11 +188,6 @@ func Load(vaultPassword string, dir string)(*map[string]*Password, error) {
 		return nil, err
 	}
 
-	//Deserializing map
-	//r := bytes.NewReader(dec)
-	//d := gob.NewDecoder(r)
-
-	//err = d.Decode(&m)
 
 	if err != nil {
 		return nil, err
@@ -165,8 +198,6 @@ func Load(vaultPassword string, dir string)(*map[string]*Password, error) {
 
 
 	json.Unmarshal(dec, &m)
-
-	//fmt.Println("JSON " + string(dec));
 
 	return &m, nil
 }
@@ -179,16 +210,21 @@ func check(e error) {
 
 func Init(vaultPassword string, dir string)(error){
 
-	//dir := os.Getenv("HOME") + "/.pl"
-	vault := dir + "/default.vault"
+	vaultFile := dir + "/default.vault"
 	saltFile := dir + "/vault.salt"
-	b, _:= fileExists(vault)
+	scryptFile := dir + "/scrypt.conf"
+
+	b, _:= fileExists(vaultFile)
 	if( b ){
 		return errors.New("A vault already exist")
 	}
 	b, _ = fileExists(saltFile)
 	if( b ){
 		return errors.New("A salt already exist")
+	}
+	b, _ = fileExists(scryptFile)
+	if( b ){
+		return errors.New("A scrypt setting already exist")
 	}
 
 	os.MkdirAll(dir, 0777)
@@ -200,8 +236,7 @@ func Init(vaultPassword string, dir string)(error){
 	err1 := ioutil.WriteFile(saltFile, []byte(sSalt), 0644)
 	check(err1)
 
-
-
+	SetScryptSettings(16384, 8, 2, dir)
 
 	m := make(map[string]*Password)
 
@@ -211,7 +246,6 @@ func Init(vaultPassword string, dir string)(error){
 }
 
 func getSalt(dir string)([]byte, error){
-	//dir := os.Getenv("HOME") + "/.pl"
 	file := dir + "/vault.salt"
 	e, _ := fileExists(file)
 
@@ -234,10 +268,6 @@ func getSalt(dir string)([]byte, error){
 
 func Save(vaultPassword string, vault *map[string]*Password, dir string)(error) {
 
-
-	//Serializing
-	//b := new(bytes.Buffer)
-	//e := gob.NewEncoder(b)
 
 	jsonVault, err := json.Marshal(vault)
 	if err != nil {

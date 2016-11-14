@@ -109,6 +109,13 @@ var (
 
 	addKey = app.Command("add-key", "Add your vault key to systems keychain in order to avoid applying key each time")
 	rmKey = app.Command("remove-key", "Remove your vault key to systems keychain")
+
+	chkey = app.Command("chkey", "Change your vault key")
+
+	chcost = app.Command("chcost", "Change scrypt cost settings")
+	chcostN = chcost.Arg("N", "CPU workfactor [16384]").Required().Int()
+	chcostR = chcost.Arg("r", "Memory cost factor [8]").Required().Int()
+	chcostP = chcost.Arg("p", "Paralleization factor [2]").Required().Int()
 )
 
 func main() {
@@ -294,7 +301,6 @@ func main() {
 		fmt.Println(out.String())
 
 	case addKey.FullCommand():
-
 		err2 := keyring.Set("pl", dir, vaultPassword)
 		if err2 != nil {
 			fmt.Println(err2)
@@ -324,6 +330,17 @@ func main() {
 			fmt.Println(err3)
 		}
 		fmt.Println("Identity removed: valut key removed from key chain")
+
+	case chkey.FullCommand():
+		fmt.Print("Enter a new vault key: ")
+		passBytes, _ := terminal.ReadPassword(0);
+		fmt.Println()
+		newVaultPassword := string(passBytes)
+		vault.Save(newVaultPassword, &m, dir)
+
+	case chcost.FullCommand():
+		vault.SetScryptSettings(*chcostN, *chcostR, *chcostP, dir)
+		vault.Save(vaultPassword, &m, dir)
 
 	default:
 
