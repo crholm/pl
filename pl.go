@@ -13,13 +13,12 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 	"github.com/zalando/go-keyring"
 
-	"github.com/crholm/pl/vault"
-
 	"encoding/binary"
 
 	"sort"
 	"os/exec"
 	"bytes"
+	"github.com/crholm/pl/vault"
 )
 
 func toClipboard(password string, secondsInClipboard int) {
