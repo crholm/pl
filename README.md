@@ -1,14 +1,12 @@
 # pwd locker
 
-A small cli application for protecting once passwords
+A small cli application for protecting your passwords
 
 ## Installation 
  
- Setting up go properly 
-
- # git clone ...
+ Setting up go properly
  
- # ./install.sh
+ # go get github.com/crholm/pl
 
 ## Help
 ```
