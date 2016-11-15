@@ -154,7 +154,7 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		gitAddAllAndCommit("No-comment");
+		gitAddAllAndCommit("No comment =)");
 
 	case mk.FullCommand():
 		m[*mkName] = createPassword(*mkName, *mkLength, *mkNoExtra)
@@ -180,7 +180,7 @@ func main() {
 
 		vault.Save(vaultPassword, &m, dir)
 		fmt.Println(*setName)
-		gitAddAllAndCommit("No-comment");
+		gitAddAllAndCommit("No comment =)");
 
 	case mv.FullCommand():
 		from, ok := m[*mvFrom]
@@ -189,7 +189,7 @@ func main() {
 			m[*mvTo].Name = *mvTo
 			delete(m, string(*mvFrom))
 			vault.Save(vaultPassword, &m, dir)
-			gitAddAllAndCommit("No-comment");
+			gitAddAllAndCommit("No comment =)");
 		}else{
 			fmt.Println(*mvFrom + " does not exist")
 		}
@@ -198,7 +198,7 @@ func main() {
 	case rm.FullCommand():
 		delete(m, string(*rmName))
 		vault.Save(vaultPassword, &m, dir)
-		gitAddAllAndCommit("No-comment");
+		gitAddAllAndCommit("No comment =)");
 
 	case ls.FullCommand():
 		l := len(m)
@@ -265,6 +265,7 @@ func main() {
 			fmt.Println(*setMetadataPassword + " does not exist")
 			return
 		}
+		gitAddAllAndCommit("No comment =)");
 
 	case rmMetadata.FullCommand():
 		delete(m[*rmMetadataPassword].Metadata, string(*rmMetadataKey))
@@ -336,10 +337,12 @@ func main() {
 		fmt.Println()
 		newVaultPassword := string(passBytes)
 		vault.Save(newVaultPassword, &m, dir)
+		gitAddAllAndCommit("No comment =)");
 
 	case chcost.FullCommand():
 		vault.SetScryptSettings(*chcostN, *chcostR, *chcostP, dir)
 		vault.Save(vaultPassword, &m, dir)
+		gitAddAllAndCommit("No comment =)");
 
 	default:
 
@@ -407,7 +410,7 @@ func gitAddAllAndCommit(message string) {
 		return
 	}
 
-	if _, err = exec.Command("git", "-C", dir, "add", "default.vault", "vault.salt").Output(); err != nil {
+	if _, err = exec.Command("git", "-C", dir, "add", "default.vault", "vault.salt", "scrypt.conf").Output(); err != nil {
 		fmt.Fprintln(os.Stderr, "1 There was an error running git command: ", err)
 		os.Exit(1)
 	}
