@@ -1,6 +1,6 @@
 # pwd locker
 
-A small cli application for protecting your passwords
+A small cli application for protecting your passwords, suitable for most levels of paranoia 
 
 ## Installation 
  
