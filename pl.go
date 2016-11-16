@@ -60,11 +60,13 @@ func createPassword(name string, pwdLen int, noExtras bool) (*vault.Password) {
 }
 
 var (
+	version = "1.0.0"
 	dir string
-	app = kingpin.New("pl", "A command-line password protection application.").Author("Rasmus Holm")
+	app = kingpin.New("pl", "Password locker is a command-line tool for managing your passwords").Author("Rasmus Holm")
 	key = app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
 	path = app.Flag("path", "Path to key vault, if deault location is not desired ($HOME/.pl)").Short('p').String()
 	stdin = app.Flag("stdin", "Reads key from stdin").Short('s').Bool()
+	versionFlag = app.Flag("version", "print pl version").Short('v').Bool()
 
 	ini = app.Command("init", "Init your vault")
 
@@ -119,18 +121,22 @@ var (
 
 func main() {
 
+
 	var command string;
 	if(len(os.Args) > 1 && os.Args[1] == "git"){
 		command = "git"
+	}else if os.Args[1] == "--version" || os.Args[1] == "-v" {
+		fmt.Println("pl version " + version)
+		return;
 	}else{
 		command = kingpin.MustParse(app.Parse(os.Args[1:]))
-
 	}
 	if(len(*path) > 0){
 		dir = *path
 	}else{
 		dir = os.Getenv("HOME") + "/.pl"
 	}
+
 
 	var vaultPassword string
 	var m map[string]*vault.Password
