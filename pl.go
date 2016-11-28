@@ -19,6 +19,12 @@ import (
 	"os/exec"
 	"bytes"
 	"github.com/crholm/pl/vault"
+	"strings"
+	"os/signal"
+	"syscall"
+	"io"
+	"regexp"
+	"github.com/fatih/color"
 )
 
 func toClipboard(password string, secondsInClipboard int) {
@@ -60,7 +66,7 @@ func createPassword(name string, pwdLen int, noExtras bool) (*vault.Password) {
 }
 
 var (
-	version = "1.0.0"
+	version = "1.0.1"
 	dir string
 	app = kingpin.New("pl", "Password locker is a command-line tool for managing your passwords").Author("Rasmus Holm")
 	key = app.Flag("key", "The key for decrypting the password vault, if not piped into the application").Short('k').String()
@@ -93,7 +99,9 @@ var (
 	mvTo = mv.Arg("to", "New password name").Required().String()
 
 	ls = app.Command("ls", "List all password names")
+	lsPattern = ls.Arg("name", "the password of intrest").String()
 	ll = app.Command("ll", "List all password names and metadata")
+	llPattern = ll.Arg("name", "the password of intrest").String()
 
 	cat = app.Command("cat", "Concatinates password to std out")
 	catName = cat.Arg("name", "Name of password").Required().String()
@@ -117,6 +125,9 @@ var (
 	chcostN = chcost.Arg("N", "CPU workfactor [16384]").Required().Int()
 	chcostR = chcost.Arg("r", "Memory cost factor [8]").Required().Int()
 	chcostP = chcost.Arg("p", "Paralleization factor [2]").Required().Int()
+
+
+	repl = app.Command("repl", "Get a pl repl / console where the same commads can be used ")
 )
 
 func main() {
@@ -131,6 +142,7 @@ func main() {
 	}else{
 		command = kingpin.MustParse(app.Parse(os.Args[1:]))
 	}
+
 	if(len(*path) > 0){
 		dir = *path
 	}else{
@@ -151,6 +163,59 @@ func main() {
 		m = *mp
 	}
 
+	if( command == repl.FullCommand()){
+		execREPL(command, vaultPassword, m, os.Args);
+	}
+
+	execCommand(command, vaultPassword, m, os.Args);
+}
+
+
+func execREPL(command string, vaultPassword string, m map[string]*vault.Password, args []string){
+	c := make(chan os.Signal, 5)
+	signal.Notify(c, os.Interrupt, syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	go func() {
+		<-c
+		os.Exit(0)
+	}()
+
+	reader := bufio.NewReader(os.Stdin)
+	term := color.New(color.FgGreen).PrintFunc()
+	for true {
+		term("pl> ")
+		str, err := reader.ReadString('\n')
+
+		if err == io.EOF {
+			os.Exit(0)
+		}
+
+		args := strings.Split(strings.Trim(str, "\n"), " ")
+
+
+		if args[0] == ""{
+			continue;
+		}else if args[0] == "--version" || args[0] == "-v" {
+			fmt.Println("pl version " + version)
+			continue;
+		}else if args[0] == "git" {
+			command = "git"
+		}else if args[0] == "exit" || args[0] == "quit" {
+			os.Exit(0)
+		}else{
+			command = kingpin.MustParse(app.Parse(args))
+		}
+
+
+		execCommand(command, vaultPassword, m, append([]string{"pl"}, args...));
+
+	}
+	os.Exit(0);
+}
+
+func execCommand(command string, vaultPassword string, m map[string]*vault.Password, args []string){
 	switch  command {
 
 	case ini.FullCommand():
@@ -207,6 +272,7 @@ func main() {
 		gitAddAllAndCommit("No comment =)");
 
 	case ls.FullCommand():
+		namePrint := color.New(color.FgBlue).Add(color.Bold).PrintlnFunc()
 		l := len(m)
 		arr := make([]string, l)
 		i := 0
@@ -216,8 +282,14 @@ func main() {
 		}
 		sort.Strings(arr)
 		for _, v := range arr {
-			fmt.Println(v)
+			matched, _ := regexp.MatchString(*lsPattern, v)
+			if !matched{
+				continue
+			}
+			namePrint(v)
 		}
+		*llPattern = "";
+
 	case ll.FullCommand():
 		l := len(m)
 		arr := make([]string, l)
@@ -227,8 +299,17 @@ func main() {
 			i++
 		}
 		sort.Strings(arr)
+
+		namePrint := color.New(color.FgBlue).Add(color.Bold).PrintlnFunc()
+		keyPrint := color.New(color.FgMagenta).PrintFunc()
 		for _, v := range arr {
-			fmt.Println(v)
+
+			matched, _ := regexp.MatchString(*llPattern, v)
+			if !matched{
+				continue
+			}
+
+			namePrint(v)
 
 			l2 := len(m[v].Metadata)
 			arr2 := make([]string, l2)
@@ -238,10 +319,12 @@ func main() {
 				j++
 			}
 			for _, v2 := range arr2 {
-				fmt.Println( "  " +v2 + ": " + m[v].Metadata[v2])
+				fmt.Print("  ")
+				keyPrint(v2 + ": ")
+				fmt.Println(m[v].Metadata[v2])
 			}
 		}
-
+		*llPattern = "";
 
 	case cat.FullCommand():
 		data, ok := m[*catName]
@@ -284,7 +367,7 @@ func main() {
 		var stderr bytes.Buffer
 
 		cmdName := "git"
-		cmdArgs := os.Args[2:]
+		cmdArgs := args[2:]
 
 		// Adding path to vault dir
 		cmdArgs = append([]string{"-C", dir }, cmdArgs...)
@@ -354,6 +437,8 @@ func main() {
 
 	}
 }
+
+
 
 func readKey() (string) {
 	var vaultPassword string
