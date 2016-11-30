@@ -20,13 +20,10 @@ import (
 	"bytes"
 	"github.com/crholm/pl/vault"
 	"strings"
-	"os/signal"
-	"syscall"
 	"io"
 	"regexp"
 	"github.com/fatih/color"
 	"github.com/chzyer/readline"
-	"io/ioutil"
 	"log"
 )
 
@@ -134,47 +131,8 @@ var (
 )
 
 
-func listFiles(path string) func(string) []string {
-	return func(line string) []string {
-		names := make([]string, 0)
-		files, _ := ioutil.ReadDir(path)
-		for _, f := range files {
-			names = append(names, f.Name())
-		}
-		return names
-	}
-}
-var completer = readline.NewPrefixCompleter(
-	readline.PcItem("mode",
-		readline.PcItem("vi"),
-		readline.PcItem("emacs"),
-	),
-	readline.PcItem("login"),
-	readline.PcItem("say",
-		readline.PcItemDynamic(listFiles("./"),
-			readline.PcItem("with",
-				readline.PcItem("following"),
-				readline.PcItem("items"),
-			),
-		),
-		readline.PcItem("hello"),
-		readline.PcItem("bye"),
-	),
-	readline.PcItem("setprompt"),
-	readline.PcItem("setpassword"),
-	readline.PcItem("bye"),
-	readline.PcItem("help"),
-	readline.PcItem("go",
-		readline.PcItem("build", readline.PcItem("-o"), readline.PcItem("-v")),
-		readline.PcItem("install",
-			readline.PcItem("-v"),
-			readline.PcItem("-vv"),
-			readline.PcItem("-vvv"),
-		),
-		readline.PcItem("test"),
-	),
-	readline.PcItem("sleep"),
-)
+
+
 
 func main() {
 
@@ -231,12 +189,71 @@ func main() {
 
 }
 
+
+
+func listPwd(m map[string]*vault.Password) func(string) []string {
+	return func(line string) []string {
+		l := len(m)
+		arr := make([]string, l)
+		i := 0
+		for k, _ := range m {
+			arr[i] = k
+			i++
+		}
+		sort.Strings(arr)
+		return arr;
+	}
+}
+
+func completer(m map[string]*vault.Password)(*readline.PrefixCompleter){
+	return readline.NewPrefixCompleter(
+		readline.PcItem("mk",
+			readline.PcItem("--noextras"),
+		),
+		readline.PcItem("set",
+			readline.PcItemDynamic(listPwd(m),),
+		),
+		readline.PcItem("cp",
+			readline.PcItemDynamic(listPwd(m),),
+		),
+		readline.PcItem("cat",
+			readline.PcItemDynamic(listPwd(m),),
+		),
+		readline.PcItem("rm",
+			readline.PcItemDynamic(listPwd(m),),
+		),
+		readline.PcItem("ll",
+			readline.PcItemDynamic(listPwd(m),),
+		),
+		readline.PcItem("ls",
+			readline.PcItemDynamic(listPwd(m),),
+		),
+		readline.PcItem("set-metadata",
+			readline.PcItemDynamic(listPwd(m),),
+		),
+		readline.PcItem("rm-metadata",
+			readline.PcItemDynamic(listPwd(m),),
+		),
+		readline.PcItem("git",
+			readline.PcItem("push"),
+			readline.PcItem("pull"),
+		),
+		readline.PcItem("add-key"),
+		readline.PcItem("remove-key"),
+		readline.PcItem("chkey"),
+		readline.PcItem("chcost"),
+		readline.PcItem("version"),
+		readline.PcItem("help"),
+		readline.PcItem("exit"),
+	)
+}
+
 func execREPL(command string, vaultPassword string, m map[string]*vault.Password, args []string){
 
 	l, err := readline.NewEx(&readline.Config{
-		Prompt:          "\033[31mpl >\033[0m ",
+		Prompt:          "\033[32mpl >\033[0m ",
 		HistoryFile:     "/tmp/readline.tmp",
-		AutoComplete:    completer,
+		AutoComplete:    completer(m),
 		InterruptPrompt: "^C",
 		EOFPrompt:       "exit",
 		HistorySearchFold: true,
@@ -248,6 +265,7 @@ func execREPL(command string, vaultPassword string, m map[string]*vault.Password
 
 	log.SetOutput(l.Stderr())
 	for {
+
 		line, err := l.Readline()
 		if err == readline.ErrInterrupt {
 			if len(line) == 0 {
@@ -280,56 +298,9 @@ func execREPL(command string, vaultPassword string, m map[string]*vault.Password
 		}
 
 		execCommand(command, vaultPassword, m, append([]string{"pl"}, args...));
-
 	}
 }
 
-
-//func execREPL(command string, vaultPassword string, m map[string]*vault.Password, args []string){
-//	c := make(chan os.Signal, 5)
-//	signal.Notify(c, os.Interrupt, syscall.SIGHUP,
-//		syscall.SIGINT,
-//		syscall.SIGTERM,
-//		syscall.SIGQUIT)
-//	go func() {
-//		<-c
-//		os.Exit(0)
-//	}()
-//
-//	reader := bufio.NewReader(os.Stdin)
-//	term := color.New(color.FgGreen).PrintFunc()
-//
-//	for true {
-//
-//		term("pl> ")
-//		str, err := reader.ReadString('\n')
-//
-//		if err == io.EOF {
-//			os.Exit(0)
-//		}
-//
-//		args := strings.Split(strings.Trim(str, "\n"), " ")
-//
-//
-//		if args[0] == ""{
-//			continue;
-//		}else if args[0] == "--version" || args[0] == "-v" {
-//			fmt.Println("pl version " + version)
-//			continue;
-//		}else if args[0] == "help"{
-//			app.Usage(args[1:])
-//		}else if args[0] == "git" {
-//			command = "git"
-//		}else if args[0] == "exit" || args[0] == "quit" {
-//			os.Exit(0)
-//		}else{
-//			command = kingpin.MustParse(app.Parse(args))
-//		}
-//
-//		execCommand(command, vaultPassword, m, append([]string{"pl"}, args...));
-//	}
-//	os.Exit(0);
-//}
 
 func execCommand(command string, vaultPassword string, m map[string]*vault.Password, args []string){
 	switch  command {
