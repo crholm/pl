@@ -164,7 +164,7 @@ func main() {
 
 
 	var vaultPassword string
-	var m map[string]*vault.Password
+	var v *vault.Vault
 
 	if command != git.FullCommand() && command != ini.FullCommand() {
 		mp, vp := readKeyAndLoad()
@@ -173,30 +173,30 @@ func main() {
 		}
 
 		vaultPassword = vp
-		m = *mp
+		v = mp
 	}
 
 	if( command == repl.FullCommand()){
 
-		execREPL(command, vaultPassword, m, os.Args)
+		execREPL(command, vaultPassword, v, os.Args)
 
 
 
 		//execREPL(command, vaultPassword, m, os.Args);
 	}else{
-		execCommand(command, vaultPassword, m, os.Args);
+		execCommand(command, vaultPassword, v, os.Args);
 	}
 
 }
 
 
 
-func listPwd(m map[string]*vault.Password) func(string) []string {
+func listPwd(v *vault.Vault) func(string) []string {
 	return func(line string) []string {
-		l := len(m)
+		l := len(v.Passwords)
 		arr := make([]string, l)
 		i := 0
-		for k, _ := range m {
+		for k, _ := range v.Passwords {
 			arr[i] = k
 			i++
 		}
@@ -205,38 +205,38 @@ func listPwd(m map[string]*vault.Password) func(string) []string {
 	}
 }
 
-func completer(m map[string]*vault.Password)(*readline.PrefixCompleter){
+func completer(v *vault.Vault)(*readline.PrefixCompleter){
 	return readline.NewPrefixCompleter(
 		readline.PcItem("mk",
 			readline.PcItem("--noextras"),
 		),
 		readline.PcItem("set",
-			readline.PcItemDynamic(listPwd(m),),
+			readline.PcItemDynamic(listPwd(v),),
 		),
 		readline.PcItem("mv",
-			readline.PcItemDynamic(listPwd(m),
-				readline.PcItemDynamic(listPwd(m),)),
+			readline.PcItemDynamic(listPwd(v),
+				readline.PcItemDynamic(listPwd(v),)),
 		),
 		readline.PcItem("cp",
-			readline.PcItemDynamic(listPwd(m),),
+			readline.PcItemDynamic(listPwd(v),),
 		),
 		readline.PcItem("cat",
-			readline.PcItemDynamic(listPwd(m),),
+			readline.PcItemDynamic(listPwd(v),),
 		),
 		readline.PcItem("rm",
-			readline.PcItemDynamic(listPwd(m),),
+			readline.PcItemDynamic(listPwd(v),),
 		),
 		readline.PcItem("ll",
-			readline.PcItemDynamic(listPwd(m),),
+			readline.PcItemDynamic(listPwd(v),),
 		),
 		readline.PcItem("ls",
-			readline.PcItemDynamic(listPwd(m),),
+			readline.PcItemDynamic(listPwd(v),),
 		),
 		readline.PcItem("set-metadata",
-			readline.PcItemDynamic(listPwd(m),),
+			readline.PcItemDynamic(listPwd(v),),
 		),
 		readline.PcItem("rm-metadata",
-			readline.PcItemDynamic(listPwd(m),),
+			readline.PcItemDynamic(listPwd(v),),
 		),
 		readline.PcItem("git",
 			readline.PcItem("push"),
@@ -252,12 +252,12 @@ func completer(m map[string]*vault.Password)(*readline.PrefixCompleter){
 	)
 }
 
-func execREPL(command string, vaultPassword string, m map[string]*vault.Password, args []string){
+func execREPL(command string, vaultPassword string, v *vault.Vault, args []string){
 
 	l, err := readline.NewEx(&readline.Config{
 		Prompt:          "\033[32mpl >\033[0m ",
 		HistoryFile:     "/tmp/readline.tmp",
-		AutoComplete:    completer(m),
+		AutoComplete:    completer(v),
 		InterruptPrompt: "^C",
 		EOFPrompt:       "exit",
 		HistorySearchFold: true,
@@ -301,12 +301,12 @@ func execREPL(command string, vaultPassword string, m map[string]*vault.Password
 			command = kingpin.MustParse(app.Parse(args))
 		}
 
-		execCommand(command, vaultPassword, m, append([]string{"pl"}, args...));
+		execCommand(command, vaultPassword, v, append([]string{"pl"}, args...));
 	}
 }
 
 
-func execCommand(command string, vaultPassword string, m map[string]*vault.Password, args []string){
+func execCommand(command string, vaultPassword string, v *vault.Vault, args []string){
 	switch  command {
 
 	case ini.FullCommand():
@@ -319,9 +319,9 @@ func execCommand(command string, vaultPassword string, m map[string]*vault.Passw
 		gitAddAllAndCommit("No comment =)");
 
 	case mk.FullCommand():
-		m[*mkName] = createPassword(*mkName, *mkLength, *mkNoExtra)
-		vault.Save(vaultPassword, &m, dir)
-		fmt.Println(*mkName + ": " + m[*mkName].Password)
+		v.Passwords[*mkName] = createPassword(*mkName, *mkLength, *mkNoExtra)
+		v.Save(vaultPassword, dir)
+		fmt.Println(*mkName + ": " + v.Passwords[*mkName].Password)
 		gitAddAllAndCommit("No comment =)");
 
 	case set.FullCommand():
@@ -333,24 +333,25 @@ func execCommand(command string, vaultPassword string, m map[string]*vault.Passw
 			*setPassword = string(passBytes)
 		}
 
-		pass, ok := m["route"]
+		pass, ok := v.Passwords["route"]
 		if (ok) {
 			pass.Password = *setPassword
 		} else {
-			m[*setName] = &vault.Password{Name: *setName, Password: *setPassword}
+			v.Passwords[*setName] = &vault.Password{Name: *setName, Password: *setPassword}
 		}
 
-		vault.Save(vaultPassword, &m, dir)
+		v.Save(vaultPassword, dir)
 		fmt.Println(*setName)
+		*setPassword = "";
 		gitAddAllAndCommit("No comment =)");
 
 	case mv.FullCommand():
-		from, ok := m[*mvFrom]
+		from, ok := v.Passwords[*mvFrom]
 		if(ok){
-			m[*mvTo] = from
-			m[*mvTo].Name = *mvTo
-			delete(m, string(*mvFrom))
-			vault.Save(vaultPassword, &m, dir)
+			v.Passwords[*mvTo] = from
+			v.Passwords[*mvTo].Name = *mvTo
+			delete(v.Passwords, string(*mvFrom))
+			v.Save(vaultPassword, dir)
 			gitAddAllAndCommit("No comment =)");
 		}else{
 			fmt.Println(*mvFrom + " does not exist")
@@ -358,16 +359,16 @@ func execCommand(command string, vaultPassword string, m map[string]*vault.Passw
 
 
 	case rm.FullCommand():
-		delete(m, string(*rmName))
-		vault.Save(vaultPassword, &m, dir)
+		delete(v.Passwords, string(*rmName))
+		v.Save(vaultPassword, dir)
 		gitAddAllAndCommit("No comment =)");
 
 	case ls.FullCommand():
 		namePrint := color.New(color.FgBlue).Add(color.Bold).PrintlnFunc()
-		l := len(m)
+		l := len(v.Passwords)
 		arr := make([]string, l)
 		i := 0
-		for k, _ := range m {
+		for k, _ := range v.Passwords {
 			arr[i] = k
 			i++
 		}
@@ -382,10 +383,10 @@ func execCommand(command string, vaultPassword string, m map[string]*vault.Passw
 		*llPattern = "";
 
 	case ll.FullCommand():
-		l := len(m)
+		l := len(v.Passwords)
 		arr := make([]string, l)
 		i := 0
-		for k, _ := range m {
+		for k, _ := range v.Passwords {
 			arr[i] = k
 			i++
 		}
@@ -393,32 +394,32 @@ func execCommand(command string, vaultPassword string, m map[string]*vault.Passw
 
 		namePrint := color.New(color.FgBlue).Add(color.Bold).PrintlnFunc()
 		keyPrint := color.New(color.FgMagenta).PrintFunc()
-		for _, v := range arr {
+		for _, s := range arr {
 
-			matched, _ := regexp.MatchString(*llPattern, v)
+			matched, _ := regexp.MatchString(*llPattern, s)
 			if !matched{
 				continue
 			}
 
-			namePrint(v)
+			namePrint(s)
 
-			l2 := len(m[v].Metadata)
+			l2 := len(v.Passwords[s].Metadata)
 			arr2 := make([]string, l2)
 			j := 0
-			for k2, _ := range m[v].Metadata {
+			for k2, _ := range v.Passwords[s].Metadata {
 				arr2[j] = k2
 				j++
 			}
-			for _, v2 := range arr2 {
+			for _, s2 := range arr2 {
 				fmt.Print("  ")
-				keyPrint(v2 + ": ")
-				fmt.Println(m[v].Metadata[v2])
+				keyPrint(s2 + ": ")
+				fmt.Println(v.Passwords[s].Metadata[s2])
 			}
 		}
 		*llPattern = "";
 
 	case cat.FullCommand():
-		data, ok := m[*catName]
+		data, ok := v.Passwords[*catName]
 		if(ok) {
 			fmt.Println(data.Password)
 		}else {
@@ -426,7 +427,7 @@ func execCommand(command string, vaultPassword string, m map[string]*vault.Passw
 		}
 
 	case cp.FullCommand():
-		data, ok := m[*cpName]
+		data, ok := v.Passwords[*cpName]
 		if(ok) {
 			toClipboard(data.Password, *cpDuration)
 		}else {
@@ -434,13 +435,13 @@ func execCommand(command string, vaultPassword string, m map[string]*vault.Passw
 		}
 
 	case setMetadata.FullCommand():
-		metadata, ok := m[*setMetadataPassword]
+		metadata, ok := v.Passwords[*setMetadataPassword]
 		if(ok){
 			if(metadata.Metadata == nil){
 				metadata.Metadata = make(map[string]string)
 			}
 			metadata.Metadata[*setMetadataKey] = *setMetadataValue;
-			vault.Save(vaultPassword, &m, dir)
+			v.Save(vaultPassword, dir)
 		}else{
 			fmt.Println(*setMetadataPassword + " does not exist")
 			return
@@ -448,8 +449,8 @@ func execCommand(command string, vaultPassword string, m map[string]*vault.Passw
 		gitAddAllAndCommit("No comment =)");
 
 	case rmMetadata.FullCommand():
-		delete(m[*rmMetadataPassword].Metadata, string(*rmMetadataKey))
-		vault.Save(vaultPassword, &m, dir)
+		delete(v.Passwords[*rmMetadataPassword].Metadata, string(*rmMetadataKey))
+		v.Save(vaultPassword, dir)
 		gitAddAllAndCommit("No comment =)");
 
 
@@ -516,12 +517,12 @@ func execCommand(command string, vaultPassword string, m map[string]*vault.Passw
 		passBytes, _ := terminal.ReadPassword(0);
 		fmt.Println()
 		newVaultPassword := string(passBytes)
-		vault.Save(newVaultPassword, &m, dir)
+		v.Save(newVaultPassword, dir)
 		gitAddAllAndCommit("No comment =)");
 
 	case chcost.FullCommand():
 		vault.SetScryptSettings(*chcostN, *chcostR, *chcostP, dir)
-		vault.Save(vaultPassword, &m, dir)
+		v.Save(vaultPassword, dir)
 		gitAddAllAndCommit("No comment =)");
 
 	default:
@@ -559,7 +560,7 @@ func readKey() (string) {
 	return vaultPassword;
 }
 
-func readKeyAndLoad() (*map[string]*vault.Password, string) {
+func readKeyAndLoad() (*vault.Vault, string) {
 
 	vaultPassword := readKey();
 

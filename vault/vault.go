@@ -15,16 +15,19 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
+type Vault struct {
+	Passwords map[string]*Password
+}
 
 type Password struct {
-	Name string
-	Password string
-	Metadata map[string]string
+	Name string `json:"name"`
+	Password string `json:"password"`
+	Metadata map[string]string `json:"metadata"`
 }
 type scryptSettings struct {
-	N int //CPU
-	R int //RAM
-	P int //Parallelism
+	N int `json:"N"`//CPU
+	R int `json:"r"`//RAM
+	P int `json:"p"`//Parallelism
 }
 
 type errorVault struct {
@@ -155,7 +158,7 @@ func fileExists(path string) (bool, error) {
 	return true, err
 }
 
-func Load(vaultPassword string, dir string)(*map[string]*Password, error) {
+func Load(vaultPassword string, dir string)(*Vault, error) {
 
 	file := dir + "/default.vault"
 
@@ -195,11 +198,11 @@ func Load(vaultPassword string, dir string)(*map[string]*Password, error) {
 
 	var m map[string]*Password
 
-
-
 	json.Unmarshal(dec, &m)
 
-	return &m, nil
+	vault := Vault{m}
+
+	return &vault, nil
 }
 
 func check(e error) {
@@ -239,8 +242,9 @@ func Init(vaultPassword string, dir string)(error){
 	SetScryptSettings(16384, 8, 2, dir)
 
 	m := make(map[string]*Password)
+	vault := Vault{m}
 
-	Save(vaultPassword, &m, dir);
+	vault.Save(vaultPassword, dir);
 
 	return nil
 }
@@ -266,10 +270,10 @@ func getSalt(dir string)([]byte, error){
 
 }
 
-func Save(vaultPassword string, vault *map[string]*Password, dir string)(error) {
+func (vault Vault)Save(vaultPassword string, dir string)(error) {
 
 
-	jsonVault, err := json.Marshal(vault)
+	jsonVault, err := json.Marshal(vault.Passwords)
 	if err != nil {
 		panic(err)
 	}
