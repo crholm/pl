@@ -24,7 +24,7 @@ type Password struct {
 	Password string `json:"password"`
 	Metadata map[string]string `json:"metadata"`
 }
-type scryptSettings struct {
+type ScryptSettings struct {
 	N int `json:"N"`//CPU
 	R int `json:"r"`//RAM
 	P int `json:"p"`//Parallelism
@@ -47,9 +47,9 @@ func hash(content []byte)([]byte){
 }
 
 func SetScryptSettings(N int, r int, p int, dir string){
-	scryptFile := dir + "/scrypt.conf"
+	scryptFile := dir + "/scrypt"
 
-	scryptData := scryptSettings{N: N, R: r, P: p}
+	scryptData := ScryptSettings{N: N, R: r, P: p}
 	jsonScryptData, err := json.Marshal(scryptData)
 	if err != nil {
 		panic(err)
@@ -61,7 +61,7 @@ func SetScryptSettings(N int, r int, p int, dir string){
 func keyStretch(key string, salt []byte, dir string)([]byte){
 	//The recommended parameters for interactive logins as of 2009 are N=16384, r=8, p=1
 
-	file := dir + "/scrypt.conf"
+	file := dir + "/scrypt"
 	err1, _ := fileExists(file)
 	if !err1 {
 		panic(errors.New("No scrypt config exist"))
@@ -73,7 +73,7 @@ func keyStretch(key string, salt []byte, dir string)([]byte){
 	}
 	check(err2)
 
-	var settings scryptSettings
+	var settings ScryptSettings
 	json.Unmarshal(data, &settings)
 
 
@@ -160,7 +160,7 @@ func fileExists(path string) (bool, error) {
 
 func Load(vaultPassword string, dir string)(*Vault, error) {
 
-	file := dir + "/default.vault"
+	file := dir + "/vault"
 
 
 
@@ -213,9 +213,9 @@ func check(e error) {
 
 func Init(vaultPassword string, dir string)(error){
 
-	vaultFile := dir + "/default.vault"
-	saltFile := dir + "/vault.salt"
-	scryptFile := dir + "/scrypt.conf"
+	vaultFile := dir + "/vault"
+	saltFile := dir + "/salt"
+	scryptFile := dir + "/scrypt"
 
 	b, _:= fileExists(vaultFile)
 	if( b ){
@@ -250,7 +250,7 @@ func Init(vaultPassword string, dir string)(error){
 }
 
 func getSalt(dir string)([]byte, error){
-	file := dir + "/vault.salt"
+	file := dir + "/salt"
 	e, _ := fileExists(file)
 
 	if !e {
@@ -287,7 +287,7 @@ func (vault Vault)Save(vaultPassword string, dir string)(error) {
 	sEnc := base64.StdEncoding.EncodeToString(enc)
 
 	//dir := os.Getenv("HOME") + "/.pl"
-	file := dir + "/default.vault"
+	file := dir + "/vault"
 
 	//Writing to file
 	err1 := ioutil.WriteFile(file, []byte(sEnc), 0644)

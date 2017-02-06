@@ -25,6 +25,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/chzyer/readline"
 	"log"
+	"github.com/crholm/pl/repo"
 )
 
 func toClipboard(password string, secondsInClipboard int) {
@@ -113,8 +114,7 @@ var (
 	rm = app.Command("rm", "Removes a password")
 	rmName = rm.Arg("name", "Name of password").Required().String()
 
-	git = app.Command("git", "Straight up git support for the password vault. git cli must be installed to be availible")
-	gitCommands = git.Arg("commands", "whatever it may be").Required().Strings()
+
 
 	addKey = app.Command("add-key", "Add your vault key to systems keychain in order to avoid applying key each time")
 	rmKey = app.Command("remove-key", "Remove your vault key to systems keychain")
@@ -126,6 +126,17 @@ var (
 	chcostR = chcost.Arg("r", "Memory cost factor [8]").Required().Int()
 	chcostP = chcost.Arg("p", "Paralleization factor [2]").Required().Int()
 
+
+	repoCmd = app.Command("repo", "Use to sync vault acrosse devices")
+	repoCmdRemote = repoCmd.Command("remote", "Adding remote repository for vaults")
+	repoCmdRemoteUrl = repoCmdRemote.Arg("url", "remote url for repository, ie. https://example.com").Required().String()
+	repoCmdRemoteEmail = repoCmdRemote.Arg("email", "email of account on remote repo").Required().String()
+
+	repoCmdPush = repoCmd.Command("push", "Pushing your local valt to your remote repo")
+	repoCmdPull = repoCmd.Command("pull", "Pulling your remote repo into your local vault")
+
+	git = app.Command("git", "Straight up git support for the password vault. It can be used for syncing across devices git cli must be installed to be availible")
+	gitCommands = git.Arg("commands", "whatever it may be").Required().Strings()
 
 	repl = app.Command("repl", "Get a pl repl / console where the same commads can be used ")
 )
@@ -453,34 +464,6 @@ func execCommand(command string, vaultPassword string, v *vault.Vault, args []st
 		v.Save(vaultPassword, dir)
 		gitAddAllAndCommit("No comment =)");
 
-
-	case git.FullCommand():
-		var out bytes.Buffer
-		var stderr bytes.Buffer
-
-		cmdName := "git"
-		cmdArgs := args[2:]
-
-		// Adding path to vault dir
-		cmdArgs = append([]string{"-C", dir }, cmdArgs...)
-
-		// Whene cloning once vault repo, making sure it ends up as the root of vault dir
-		if len(cmdArgs) > 0 && cmdArgs[0] == "clone" {
-			cmdArgs = append(cmdArgs, ".")
-		}
-
-		cmd := exec.Command(cmdName, cmdArgs...)
-		cmd.Stdout = &out
-		cmd.Stderr = &stderr
-
-		err := cmd.Run()
-		if err != nil {
-			fmt.Println(fmt.Sprint(err))
-			fmt.Println(stderr.String())
-			return
-		}
-		fmt.Println(out.String())
-
 	case addKey.FullCommand():
 		err2 := keyring.Set("pl", dir, vaultPassword)
 		if err2 != nil {
@@ -524,6 +507,45 @@ func execCommand(command string, vaultPassword string, v *vault.Vault, args []st
 		vault.SetScryptSettings(*chcostN, *chcostR, *chcostP, dir)
 		v.Save(vaultPassword, dir)
 		gitAddAllAndCommit("No comment =)");
+
+	case repoCmdRemote.FullCommand():
+		r := repo.Repo{Url: *repoCmdRemoteUrl, Email: *repoCmdRemoteEmail}
+		r.SetRemote(dir);
+
+	case repoCmdPush.FullCommand():
+		r := repo.Load(dir);
+		r.Push(dir)
+
+	case repoCmdPull.FullCommand():
+		r := repo.Load(dir);
+		r.Pull(dir)
+
+	case git.FullCommand():
+		var out bytes.Buffer
+		var stderr bytes.Buffer
+
+		cmdName := "git"
+		cmdArgs := args[2:]
+
+		// Adding path to vault dir
+		cmdArgs = append([]string{"-C", dir }, cmdArgs...)
+
+		// Whene cloning once vault repo, making sure it ends up as the root of vault dir
+		if len(cmdArgs) > 0 && cmdArgs[0] == "clone" {
+			cmdArgs = append(cmdArgs, ".")
+		}
+
+		cmd := exec.Command(cmdName, cmdArgs...)
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println(fmt.Sprint(err))
+			fmt.Println(stderr.String())
+			return
+		}
+		fmt.Println(out.String())
 
 	default:
 
@@ -593,7 +615,7 @@ func gitAddAllAndCommit(message string) {
 		return
 	}
 
-	if _, err = exec.Command("git", "-C", dir, "add", "default.vault", "vault.salt", "scrypt.conf").Output(); err != nil {
+	if _, err = exec.Command("git", "-C", dir, "add", "vault", "salt", "scrypt").Output(); err != nil {
 		fmt.Fprintln(os.Stderr, "1 There was an error running git command: ", err)
 		os.Exit(1)
 	}
